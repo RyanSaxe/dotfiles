@@ -11,6 +11,39 @@ repos:
         # CI's checkout stages nothing, so check every file it is given.
         args: [--enforce-all]
 
+  - repo: https://github.com/rvben/rumdl-pre-commit
+    rev: v0.3.4
+    hooks:
+      - id: rumdl-check
+        args: [--fix]
+
+  - repo: local
+    hooks:
+      - id: max-file-lines
+        name: max-file-lines
+        # Hard 1,000-line cap on source files; skips lockfiles, generated,
+        # minified, SVG, JSON, data and Markdown files.
+        entry: >-
+          python3 -c 'import pathlib, re, sys;
+          skip_ext = {".lock", ".svg", ".json", ".jsonc", ".csv", ".tsv", ".jsonl", ".ndjson", ".sql", ".xml", ".md", ".mdx", ".markdown", ".map", ".snap", ".po", ".pot"};
+          skip_re = re.compile(r"(^|/)([^/]+-lock\.[^/]+|[^/]+\.(min|generated|gen)\.[^/]+|[^/]+_pb2\.py|[^/]+\.pb\.go)$");
+          bad = [];
+          [bad.append((p, n)) for p in sys.argv[1:]
+           if pathlib.Path(p).suffix.lower() not in skip_ext and not skip_re.search(p)
+           and (n := sum(1 for _ in pathlib.Path(p).open("rb"))) > 1000];
+          [print(f"{p}: {n} lines (limit 1000) - split this file along a domain boundary.", file=sys.stderr) for p, n in bad];
+          sys.exit(1 if bad else 0)'
+        language: python
+        types: [text]
+
+      # BYOR project rules: keep only when .byor/rules/project/ exists.
+      - id: ast-grep
+        name: ast-grep
+        # Pinned through uvx so Ubuntu CI runs it without a separate install.
+        entry: uvx --from ast-grep-cli@0.51.3 ast-grep scan
+        language: system
+        pass_filenames: false
+
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.5
@@ -24,6 +57,16 @@ repos:
     rev: v0.0.105
     hooks:
       - id: ty
+
+  # Python: keep uv.lock in sync with pyproject.toml.
+  - repo: local
+    hooks:
+      - id: uv-lock-check
+        name: uv-lock-check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
 
   # Notebooks: committed without their outputs.
   - repo: https://github.com/kynan/nbstripout
@@ -42,21 +85,137 @@ repos:
         files: \.([cm]?[jt]sx?|css|html|json|ya?ml|toml)$
       - id: oxlint
         name: oxlint
+        # For TypeScript repos with oxlint-tsgolint installed, append
+        # `--type-aware --type-check` here so oxlint checks types in place of a
+        # separate tsc hook. A framework with its own checker (such as
+        # `astro check`) runs it in its own hook instead.
         entry: npx --no-install oxlint --deny-warnings
         language: system
         files: \.[cm]?[jt]sx?$
 
-      # Web with a build step: tsc reads tsconfig.json only when it's given
-      # no file names, so it checks the whole project.
-      - id: tsc
-        name: tsc
-        entry: npx --no-install tsc --noEmit
+      # Static HTML: keep only for static HTML sites or templates that need
+      # HTML lint rules beyond oxfmt.
+      - id: markuplint
+        name: markuplint
+        entry: npx --no-install markuplint
         language: system
-        files: \.[cm]?tsx?$|^tsconfig\.json$
+        files: \.html$
+
+  # Rust
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo-fmt
+        entry: cargo fmt --all
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: cargo-clippy
+        name: cargo-clippy
+        entry: cargo clippy --all-targets -- -D warnings
+        language: system
+        files: (\.rs$|^Cargo\.(toml|lock)$)
+        pass_filenames: false
+      - id: cargo-lock-check
+        name: cargo-lock-check
+        entry: sh -c 'cargo metadata --locked --format-version 1 >/dev/null'
+        language: system
+        files: ^Cargo\.(toml|lock)$
         pass_filenames: false
 
-  - repo: https://github.com/rvben/rumdl-pre-commit
-    rev: v0.3.4
+  # Go: for a small helper without .golangci.yml, replace the golangci-lint
+  # hooks with `gofmt -w` and `go vet ./...`.
+  - repo: local
     hooks:
-      - id: rumdl-check
-        args: [--fix]
+      - id: golangci-lint-fmt
+        name: golangci-lint-fmt
+        entry: golangci-lint fmt
+        language: system
+        files: \.go$
+        pass_filenames: false
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run
+        language: system
+        files: (\.go$|^go\.(mod|sum)$|^\.golangci\.yml$)
+        pass_filenames: false
+      - id: go-mod-tidy
+        name: go-mod-tidy
+        entry: go mod tidy -diff
+        language: system
+        files: ^go\.(mod|sum)$
+        pass_filenames: false
+
+  # Lua
+  - repo: local
+    hooks:
+      - id: stylua
+        name: stylua
+        entry: stylua
+        language: system
+        files: \.lua$
+      - id: emmylua-check
+        name: emmylua-check
+        entry: emmylua_check .
+        language: system
+        files: (\.lua$|^\.emmyrc\.json$)
+        pass_filenames: false
+      - id: luacheck-complexity
+        name: luacheck (complexity)
+        # Only code 561 (cyclomatic complexity); emmylua_check owns static analysis.
+        entry: luacheck --no-config --only 561 --max-cyclomatic-complexity 10
+        language: system
+        files: \.lua$
+
+  # Shell
+  - repo: local
+    hooks:
+      - id: shfmt
+        name: shfmt
+        entry: shfmt --write --indent 2
+        language: system
+        types: [shell]
+        # shfmt has no zsh dialect.
+        exclude: \.zsh$
+      - id: shellcheck
+        name: shellcheck
+        # Check POSIX sh, bash and dash scripts; skip zsh scripts.
+        entry: >-
+          sh -c 'rc=0; for f in "$@"; do
+            case "$f" in *.zsh) continue ;; esac
+            case "$(head -n 1 "$f")" in *zsh*) continue ;; esac
+            shellcheck "$f" || rc=1
+          done; exit $rc' --
+        language: system
+        types: [shell]
+      - id: zsh-syntax
+        name: zsh syntax check
+        entry: >-
+          sh -c 'for f in "$@"; do
+            case "$f" in
+              *.zsh) zsh -n "$f" || exit 1 ;;
+              *) case "$(head -n 1 "$f")" in *zsh*) zsh -n "$f" || exit 1 ;; esac ;;
+            esac
+          done' --
+        language: system
+        files: \.(zsh|sh)$
+
+  # Nix
+  - repo: local
+    hooks:
+      - id: nixfmt
+        name: nixfmt
+        entry: nixfmt
+        language: system
+        files: \.nix$
+      - id: deadnix
+        name: deadnix
+        entry: deadnix --fail
+        language: system
+        files: \.nix$
+      - id: statix
+        name: statix
+        entry: statix check
+        language: system
+        files: \.nix$
+        pass_filenames: false

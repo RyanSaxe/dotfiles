@@ -26,7 +26,7 @@ in
     base = mode;
     overrides = {
       # Text, by how much it should be read.
-      text = t.text;
+      inherit (t) text error; # error is also the mode that bypasses permissions
       inactive = t.muted; # secondary text, and the mark before a sent message
       subtle = t.faint; # dashed rules, queued and skipped marks
       inverseText = t.background; # text on a filled label
@@ -67,7 +67,6 @@ in
       claudeBlue_FOR_SYSTEM_SPINNER = t.info; # the spinner while hooks run
       claudeBlueShimmer_FOR_SYSTEM_SPINNER = shimmer;
       success = t.ok;
-      error = t.error; # also the mode that bypasses permissions
       warning = t.warn; # also auto mode
       warningShimmer = shimmer;
       merged = t.done; # a merged pull request

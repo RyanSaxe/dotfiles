@@ -28,7 +28,7 @@ end
 ---@param row integer 1-based
 ---@return string
 local function line_at(buf, row)
-  return vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1]
+  return vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
 end
 
 ---@param buf integer
@@ -41,7 +41,12 @@ local function in_fence(buf, row)
   end
   -- Inside a list item, the first column belongs to the item, so look where the line's text starts.
   local col = (line_at(buf, row):find("%S") or 1) - 1
-  local node = parser:parse()[1]:root():named_descendant_for_range(row - 1, col, row - 1, col)
+  local trees = parser:parse()
+  local root = trees and trees[1] and trees[1]:root()
+  if not root then
+    return false
+  end
+  local node = root:named_descendant_for_range(row - 1, col, row - 1, col)
   while node do
     if node:type() == "fenced_code_block" then
       return true
@@ -88,17 +93,27 @@ end
 ---@return string YYYY-MM-DD that many days from today
 function M.day(days)
   local today = os.date("*t")
-  return os.date("%Y-%m-%d", os.time({ year = today.year, month = today.month, day = today.day + days, hour = 12 }))
+  local year = assert(tonumber(today.year))
+  local month = assert(tonumber(today.month))
+  local day = assert(tonumber(today.day))
+  local time = os.time({
+    year = math.floor(year),
+    month = math.floor(month),
+    day = math.floor(day) + days,
+    hour = 12,
+  })
+  return os.date("%Y-%m-%d", time) --[[@as string]]
 end
 
 ---@param date string
 ---@return integer? time noon on that day, or nil when date is not a real YYYY-MM-DD
 local function noon(date)
   local year, month, day = date:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-  if not year then
+  local y, m, d = tonumber(year), tonumber(month), tonumber(day)
+  if not (y and m and d) then
     return nil
   end
-  local time = os.time({ year = tonumber(year), month = tonumber(month), day = tonumber(day), hour = 12 })
+  local time = os.time({ year = math.floor(y), month = math.floor(m), day = math.floor(d), hour = 12 })
   if os.date("%Y-%m-%d", time) == date then
     return time
   end
@@ -108,6 +123,17 @@ end
 ---@return string label such as "Friday 2026-11-20"
 function M.label(date)
   return WEEKDAYS[os.date("*t", noon(date)).wday] .. " " .. date
+end
+
+---@param word string lowercase prefix of length >= 3
+---@return string? date YYYY-MM-DD
+local function weekday_date(word)
+  local today = os.date("*t").wday
+  for wday, name in ipairs(WEEKDAYS) do
+    if vim.startswith(name:lower(), word) then
+      return M.day(math.floor((wday - today) % 7))
+    end
+  end
 end
 
 ---Reads a date as ws's dueDate does: today, tmr or tomorrow, a number of
@@ -124,14 +150,10 @@ function M.due_date(word)
   elseif word == "tmr" or word == "tomorrow" then
     return M.day(1)
   elseif word:match("^%d+d$") then
-    return M.day(tonumber(word:sub(1, -2)))
+    local days = tonumber(word:sub(1, -2))
+    return days and M.day(math.floor(days)) or nil
   elseif #word >= 3 then
-    local today = os.date("*t").wday
-    for wday, name in ipairs(WEEKDAYS) do
-      if vim.startswith(name:lower(), word) then
-        return M.day((wday - today) % 7)
-      end
-    end
+    return weekday_date(word)
   end
 end
 
@@ -147,7 +169,8 @@ local function task_text(buf, row)
   local first = assert(M.find(buf, row))
   local lines = vim.api.nvim_buf_get_lines(buf, first - 1, last_row(buf, first), false)
   local text = table.concat(lines, "\n")
-  return first, lines, text, text:find(DUE)
+  local from, to, at = text:find(DUE)
+  return first, lines, text, from, to, at --[[@as integer?]]
 end
 
 ---The range that removing the due date of the task that a line is part of
@@ -157,10 +180,11 @@ end
 ---@return lsp.Range? range 0-based lines and byte columns, or nil when the task has no date
 function M.due_range(buf, row)
   local first, lines, _, from, to = task_text(buf, row)
-  if not from then
+  if not from or not to then
     return nil
   end
   ---@param offset integer 1-based, in the lines joined with "\n"
+  ---@return lsp.Position
   local function position(offset)
     for i, line in ipairs(lines) do
       if offset <= #line + 1 then
@@ -168,6 +192,8 @@ function M.due_range(buf, row)
       end
       offset = offset - #line - 1
     end
+    local last_line = lines[#lines] or ""
+    return { line = first + #lines - 2, character = #last_line }
   end
   return { start = position(from), ["end"] = position(to + 1) }
 end
@@ -180,9 +206,9 @@ end
 local function set_due(buf, row, date)
   local first, lines, text, from, to, at = task_text(buf, row)
   local last = first + #lines - 1
-  if from and date then
+  if from and to and at and date then
     text = text:sub(1, at - 1) .. date .. text:sub(to + 1)
-  elseif from then
+  elseif from and to then
     text = text:sub(1, from - 1) .. text:sub(to + 1)
   elseif date then
     text = (text:gsub("%s+$", "")) .. " 📅 " .. date
@@ -204,6 +230,9 @@ function M.toggle()
     return no_task()
   end
   local box = line_at(buf, first):find("%[")
+  if not box then
+    return
+  end
   vim.api.nvim_buf_set_text(buf, first - 1, box, first - 1, box + 1, { mark == " " and "x" or " " })
 end
 

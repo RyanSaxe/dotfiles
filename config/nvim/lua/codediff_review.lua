@@ -62,10 +62,20 @@ local function configure_later(tabpage)
 end
 
 ---@param event vim.api.keyset.create_autocmd.callback_args
-local function on_open(event)
+---@return integer?
+local function event_tabpage(event)
   local data = event.data
   local tabpage = data and data.tabpage
   if type(tabpage) ~= "number" then
+    return nil
+  end
+  return math.floor(tabpage)
+end
+
+---@param event vim.api.keyset.create_autocmd.callback_args
+local function on_open(event)
+  local tabpage = event_tabpage(event)
+  if not tabpage then
     return
   end
 
@@ -75,9 +85,8 @@ end
 
 ---@param event vim.api.keyset.create_autocmd.callback_args
 local function on_file_select(event)
-  local data = event.data
-  local tabpage = data and data.tabpage
-  if type(tabpage) ~= "number" then
+  local tabpage = event_tabpage(event)
+  if not tabpage then
     return
   end
 
@@ -106,9 +115,8 @@ end
 
 ---@param event vim.api.keyset.create_autocmd.callback_args
 local function on_close(event)
-  local data = event.data
-  local tabpage = data and data.tabpage
-  if type(tabpage) ~= "number" then
+  local tabpage = event_tabpage(event)
+  if not tabpage then
     return
   end
 

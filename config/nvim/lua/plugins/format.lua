@@ -53,9 +53,12 @@ end
 
 ---@param pyproject string
 local function configures_rumdl(pyproject)
-  return vim.iter(vim.fn.readfile(pyproject)):any(function(line)
-    return line:match("^%[tool%.rumdl") ~= nil
-  end)
+  for _, line in ipairs(vim.fn.readfile(pyproject)) do
+    if line:match("^%[tool%.rumdl") ~= nil then
+      return true
+    end
+  end
+  return false
 end
 
 ---Looks for rumdl's config files in rumdl's order, in each folder above the
@@ -164,7 +167,8 @@ return {
         if not vim.fs.root(buf, oxfmt_configs) then
           local editorconfig = vim.b[buf].editorconfig or {}
           local defaults = editorconfig.max_line_length and "defaults-without-width.json" or "defaults.json"
-          oxfmt.prepend_args = { "--config", vim.fs.joinpath(vim.fn.stdpath("config"), "oxfmt", defaults) }
+          local config_dir = vim.fn.stdpath("config") --[[@as string]]
+          oxfmt.prepend_args = { "--config", vim.fs.joinpath(config_dir, "oxfmt", defaults) }
         end
         return oxfmt
       end

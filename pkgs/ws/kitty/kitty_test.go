@@ -3,10 +3,9 @@ package kitty_test
 import (
 	"strings"
 	"testing"
+	"workspace/kitty"
 
 	"github.com/charmbracelet/x/ansi"
-
-	"workspace/kitty"
 )
 
 // Lip Gloss and Bubble Tea measure every line with x/ansi, so if it counted a

@@ -91,9 +91,10 @@ def import_orders(since: datetime, *, api: OrdersApi, db: Database) -> ImportRep
 
 A test can call `validate` with plain values, and call `import_orders` with
 a fake API and an in-memory database. Ask for the smallest dependency that
-works, a callable for one operation and a protocol for several methods. When
-a test needs a long setup or many mocks, the code is too coupled, so fix its
-boundaries rather than the test.
+works, a callable for one operation and a protocol for several methods; reserve
+an `ABC` for subclasses that share real base behavior, and check closed unions
+exhaustively with `assert_never`. When a test needs a long setup or many mocks,
+the code is too coupled, so fix its boundaries rather than the test.
 
 ## Boundaries
 

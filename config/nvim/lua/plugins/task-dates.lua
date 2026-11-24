@@ -24,7 +24,7 @@ end
 
 ---@param buf integer
 ---@param row integer 1-based
----@return string line, or "" above the first line or below the last
+---@return string line # "" above the first line or below the last
 local function line_at(buf, row)
   return row >= 1 and vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
 end

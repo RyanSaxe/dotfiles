@@ -5,12 +5,11 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"workspace/mux"
+	"workspace/popup"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-
-	"workspace/mux"
-	"workspace/popup"
 )
 
 // filesPopup lists dir's files as fd finds them, one kind per tab: the

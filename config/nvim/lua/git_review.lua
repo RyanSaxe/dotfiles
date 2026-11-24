@@ -78,6 +78,52 @@ local function command_error(result)
   return detail ~= "" and detail or "unknown error"
 end
 
+---@param data table
+---@param fallback_number integer?
+---@return integer? number, string? base, string? head
+local function extract_pr_fields(data, fallback_number)
+  local actual_number = tonumber(data.number or fallback_number)
+  local base = type(data.baseRefName) == "string" and data.baseRefName or ""
+  local head = type(data.headRefName) == "string" and data.headRefName or ""
+  if not actual_number or base == "" or head == "" then
+    return nil, nil, nil
+  end
+  return math.floor(actual_number), base, head
+end
+
+---@param root string
+---@param repo string
+---@param number integer?
+---@param result vim.SystemCompleted
+---@return GitReviewContext? context, string? detail, string? notification
+local function parse_pr_result(root, repo, number, result)
+  if result.code ~= 0 then
+    local detail = command_error(result)
+    local subject = number and (" PR #" .. tostring(number)) or " current branch"
+    return nil, detail, "Could not resolve" .. subject .. ": " .. detail
+  end
+
+  local ok, data = pcall(vim.json.decode, result.stdout or "")
+  if not ok or type(data) ~= "table" then
+    return nil, "invalid GitHub response", "Could not parse the GitHub PR details"
+  end
+
+  local actual_number, base, head = extract_pr_fields(data, number)
+  if not actual_number or not base or not head then
+    return nil, "the GitHub PR did not include its branches", "The GitHub PR did not include its branches"
+  end
+
+  ---@type GitReviewContext
+  local context = {
+    root = normalize(root),
+    repo = repo,
+    number = actual_number,
+    base = base,
+    head = head,
+  }
+  return context, nil, nil
+end
+
 ---@param root string
 ---@param repo string
 ---@param number integer?
@@ -93,45 +139,11 @@ local function fetch_pr_context(root, repo, number, quiet, callback)
   ---@param result vim.SystemCompleted
   vim.system(args, { cwd = root, text = true }, function(result)
     schedule(function()
-      if result.code ~= 0 then
-        local detail = command_error(result)
-        if not quiet then
-          local subject = number and (" PR #" .. tostring(number)) or " current branch"
-          notify("Could not resolve" .. subject .. ": " .. detail, vim.log.levels.ERROR)
-        end
-        callback(nil, detail)
-        return
+      local context, detail, message = parse_pr_result(root, repo, number, result)
+      if not context and not quiet and message then
+        notify(message, vim.log.levels.ERROR)
       end
-
-      local ok, data = pcall(vim.json.decode, result.stdout or "")
-      if not ok or type(data) ~= "table" then
-        local detail = "invalid GitHub response"
-        if not quiet then
-          notify("Could not parse the GitHub PR details", vim.log.levels.ERROR)
-        end
-        callback(nil, detail)
-        return
-      end
-
-      local actual_number = tonumber(data.number or number)
-      local base = type(data.baseRefName) == "string" and data.baseRefName or ""
-      local head = type(data.headRefName) == "string" and data.headRefName or ""
-      if not actual_number or base == "" or head == "" then
-        local detail = "the GitHub PR did not include its branches"
-        if not quiet then
-          notify("The GitHub PR did not include its branches", vim.log.levels.ERROR)
-        end
-        callback(nil, detail)
-        return
-      end
-
-      callback({
-        root = normalize(root),
-        repo = repo,
-        number = actual_number,
-        base = base,
-        head = head,
-      }, nil)
+      callback(context, detail)
     end)
   end)
 end
@@ -277,7 +289,7 @@ function M.open_in_codediff(item)
   end
 
   ---@param context GitReviewContext?
-  fetch_pr_context(root, repo, number, false, function(context)
+  fetch_pr_context(root, repo, math.floor(number), false, function(context)
     if not context then
       return
     end
@@ -328,7 +340,8 @@ end
 local function worktree_pr_number(root)
   local branch = git_output(root, { "branch", "--show-current" })
   local number = branch and branch:match("pr%-(%d+)$")
-  return number and tonumber(number) or nil
+  local parsed = number and tonumber(number) or nil
+  return parsed and math.floor(parsed) or nil
 end
 
 ---@param context GitReviewContext

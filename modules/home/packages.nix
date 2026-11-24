@@ -42,116 +42,131 @@ let
       pkgs.mermaid-cli;
 in
 {
-  home.packages =
-    lib.optionals (has "base") (
-      with pkgs;
-      [
-        curl
-        fd
-        fzf
-        jq
-        ripgrep
-        rsync
-        tree
-        wget
+  home = {
+    packages =
+      lib.optionals (has "base") (
+        with pkgs;
+        [
+          curl
+          fd
+          fzf
+          jq
+          ripgrep
+          rsync
+          tree
+          wget
 
-        # Neovim's language servers and formatters. Mason fills in the rest.
-        ast-grep
-        gopls
-        lua-language-server
-        nil
-        nixfmt
-        oxfmt
-        # For the projects that still have a Prettier config.
-        prettier
-        rumdl
-        rust-analyzer
-        shfmt
-        stylua
-        tree-sitter
+          # Neovim's language servers, formatters and linters. Mason fills in the rest.
+          ast-grep
+          deadnix
+          emmylua-check
+          golangci-lint
+          gopls
+          lua-language-server
+          luaPackages.luacheck
+          nil
+          nixfmt
+          oxfmt
+          # For the projects that still have a Prettier config.
+          prettier
+          rumdl
+          rust-analyzer
+          shellcheck
+          shfmt
+          statix
+          stylua
+          tree-sitter
 
-        go
-        nodejs_26
-        uv
+          go
+          nodejs_26
+          uv
 
-        age
-        sops
+          age
+          sops
 
-        # The agent besides Codex that every computer has, which pair's hub
-        # can wake.
-        github-copilot-cli
+          # The agent besides Codex that every computer has, which pair's hub
+          # can wake.
+          github-copilot-cli
 
-        # What snacks.nvim draws a note's pictures, diagrams and math with:
-        # ImageMagick for every picture, in the build that reads PDFs, and
-        # LaTeX with the packages its math template loads.
-        imagemagickBig
-        (texliveBasic.withPackages (
-          tex: with tex; [
-            amsfonts
-            mathtools
-            preview
-            standalone
-            varwidth
-            xcolor
+          # What snacks.nvim draws a note's pictures, diagrams and math with:
+          # ImageMagick for every picture, in the build that reads PDFs, and
+          # LaTeX with the packages its math template loads.
+          imagemagickBig
+          (texliveBasic.withPackages (
+            tex: with tex; [
+              amsfonts
+              mathtools
+              preview
+              standalone
+              varwidth
+              xcolor
+            ]
+          ))
+        ]
+        ++ [ mermaid-cli ]
+      )
+      # Rex and sketchybar use JetBrains Mono's Nerd Fonts, and Ghostty the
+      # JetBrains Mono built into it.
+      ++ lib.optionals (has "gui") [ pkgs.nerd-fonts.jetbrains-mono ]
+      ++ lib.optionals (has "personal") [
+        # pi, which pair's hub can wake, and the Python that `python3` runs.
+        # Antigravity CLI installs and updates itself into ~/.local/bin.
+        pkgs.pi-coding-agent
+        (pkgs.python312.withPackages (
+          python: with python; [
+            numpy
+            pillow
+            websocket-client
           ]
         ))
-      ]
-      ++ [ mermaid-cli ]
-    )
-    # Rex and sketchybar use JetBrains Mono's Nerd Fonts, and Ghostty the
-    # JetBrains Mono built into it.
-    ++ lib.optionals (has "gui") [ pkgs.nerd-fonts.jetbrains-mono ]
-    ++ lib.optionals (has "personal") [
-      # pi, which pair's hub can wake, and the Python that `python3` runs.
-      # Antigravity CLI installs and updates itself into ~/.local/bin.
-      pkgs.pi-coding-agent
-      (pkgs.python312.withPackages (
-        python: with python; [
-          numpy
-          pillow
-          websocket-client
-        ]
-      ))
-    ];
+      ];
 
-  # Go keeps its module cache and the tools `go install` builds in GOPATH,
-  # ~/go by default, where the go popup's walk of the home folder spent
-  # nearly all its time. Under ~/.local/share it sits in a hidden folder,
-  # which the walk skips.
-  home.sessionVariables.GOPATH = lib.mkIf (has "base") "${config.xdg.dataHome}/go";
+    # Go keeps its module cache and the tools `go install` builds in GOPATH,
+    # ~/go by default, where the go popup's walk of the home folder spent
+    # nearly all its time. Under ~/.local/share it sits in a hidden folder,
+    # which the walk skips.
+    sessionVariables.GOPATH = lib.mkIf (has "base") "${config.xdg.dataHome}/go";
 
-  home.activation.uvTools = lib.mkIf (has "base") (
-    lib.hm.dag.entryAfter ([ "writeBoundary" ] ++ lib.optionals (has "personal") [ "agyInstall" ]) ''
-      for tool in ${lib.escapeShellArgs uvTools}; do
-        if ! ${pkgs.uv}/bin/uv tool list 2>/dev/null | grep -q "^$tool "; then
-          run ${pkgs.uv}/bin/uv tool install "$tool"
-          if [ "$tool" = byor ]; then
-            # Only the agents this computer has, since Claude and Antigravity
-            # are only on a personal one. The switch's own PATH has none of
-            # their folders.
-            has() { PATH="${agentPath}" command -v "$1" > /dev/null; }
-            agents=skill
-            ${lib.optionalString (has "personal") ''
-              has claude && agents="$agents,claude-code"
-              has agy && agents="$agents,antigravity"
-            ''}
-            has codex && agents="$agents,codex"
-            run "$HOME/.local/bin/byor" install --agents "$agents" < /dev/null
+    activation.uvTools = lib.mkIf (has "base") (
+      lib.hm.dag.entryAfter ([ "writeBoundary" ] ++ lib.optionals (has "personal") [ "agyInstall" ]) ''
+        for tool in ${lib.escapeShellArgs uvTools}; do
+          if ! ${pkgs.uv}/bin/uv tool list 2>/dev/null | grep -q "^$tool "; then
+            run ${pkgs.uv}/bin/uv tool install "$tool"
+            if [ "$tool" = byor ]; then
+              # Only the agents this computer has, since Claude and Antigravity
+              # are only on a personal one. The switch's own PATH has none of
+              # their folders.
+              has() { PATH="${agentPath}" command -v "$1" > /dev/null; }
+              agents=skill
+              ${lib.optionalString (has "personal") ''
+                has claude && agents="$agents,claude-code"
+                has agy && agents="$agents,antigravity"
+              ''}
+              has codex && agents="$agents,codex"
+              run "$HOME/.local/bin/byor" install --agents "$agents" < /dev/null
+            fi
           fi
-        fi
-      done
-    ''
-  );
+        done
+      ''
+    );
 
-  # byor's global rules, its command rules, its style package and the
-  # scripts their checks run, linked from the checkout so a rule byor writes
-  # lands in the repo.
-  # byor owns the rest of ~/.config/byor.
-  xdg.configFile = lib.mkIf (has "personal") (
-    lib.genAttrs [ "byor/rules" "byor/commands" "byor/packages" "byor/scripts" ] (path: {
-      source = config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/${path}";
+    sessionPath = [ "$HOME/.local/bin" ];
+  };
+
+  # Global Ruff fallback on every machine, plus byor's tracked config, rules,
+  # command rules, packages and check scripts on personal machines, linked from
+  # the checkout so edits land straight in the repo.
+  # byor keeps machine-specific state (repos.yml, state.yml) in ~/.local/state/byor.
+  xdg.configFile = lib.mkMerge [
+    (lib.mkIf (has "base") {
+      "ruff/ruff.toml".source =
+        config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/ruff/ruff.toml";
     })
-  );
-
-  home.sessionPath = [ "$HOME/.local/bin" ];
+    (lib.mkIf (has "personal") (
+      lib.genAttrs [ "byor/config.yml" "byor/rules" "byor/commands" "byor/packages" "byor/scripts" ]
+        (path: {
+          source = config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/${path}";
+        })
+    ))
+  ];
 }

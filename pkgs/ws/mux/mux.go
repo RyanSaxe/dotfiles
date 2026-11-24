@@ -13,7 +13,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-
 	"workspace/kitty"
 	"workspace/layout"
 )
@@ -73,18 +72,7 @@ type Place struct {
 func (s Snapshot) Places() []Place {
 	var places []Place
 	for _, p := range s.Panes {
-		i := slices.IndexFunc(places, func(pl Place) bool { return pl.Session == p.Session && pl.Label == p.place() })
-		if i < 0 {
-			places = append(places, Place{Label: p.place(), Session: p.Session, Named: p.place() != p.Label})
-			i = len(places) - 1
-		}
-		pl := &places[i]
-		if p.Tab != "" && !slices.Contains(pl.Tabs, p.Tab) {
-			pl.Tabs = append(pl.Tabs, p.Tab)
-		}
-		if p.Landing || pl.Tab == "" {
-			pl.Tab = p.Tab
-		}
+		places = addPaneToPlaces(places, p)
 	}
 	for i, pl := range places {
 		places[i].Whole = !slices.ContainsFunc(places, func(other Place) bool { return other.Session == pl.Session && other.Label != pl.Label })
@@ -93,6 +81,22 @@ func (s Snapshot) Places() []Place {
 		if !slices.ContainsFunc(places, func(pl Place) bool { return pl.Session == session.ID }) {
 			places = append(places, Place{Label: session.Label, Session: session.ID, Whole: true})
 		}
+	}
+	return places
+}
+
+func addPaneToPlaces(places []Place, p Pane) []Place {
+	i := slices.IndexFunc(places, func(pl Place) bool { return pl.Session == p.Session && pl.Label == p.place() })
+	if i < 0 {
+		places = append(places, Place{Label: p.place(), Session: p.Session, Named: p.place() != p.Label})
+		i = len(places) - 1
+	}
+	pl := &places[i]
+	if p.Tab != "" && !slices.Contains(pl.Tabs, p.Tab) {
+		pl.Tabs = append(pl.Tabs, p.Tab)
+	}
+	if p.Landing || pl.Tab == "" {
+		pl.Tab = p.Tab
 	}
 	return places
 }
@@ -227,7 +231,9 @@ func ParseStatus(s string) (Status, bool) {
 	return Open, false
 }
 
-func run(name string, args ...string) (string, error) { return output(exec.Command(name, args...)) }
+func run(name string, args ...string) (string, error) {
+	return output(exec.Command(name, args...)) //nolint:gosec // callers pass fixed mux binary names ("rex" or "tmux")
+}
 
 // output runs cmd and returns its trimmed output. A failure reads as what
 // the program printed to stderr.

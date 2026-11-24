@@ -20,17 +20,19 @@
         else
           "${config.xdg.configHome}/sops/age/keys.txt";
       defaultSopsFile = config.dotfiles.secretsFile;
-      # The Pushover hook reads these on every computer.
-      secrets.pushover-user = { };
-      secrets.pushover-token = { };
-      # Each computer's Tailscale address, where its pair hub listens.
-      secrets.pair-hub-host.key = "pair-hub-host/${config.dotfiles.host}";
-      # Repositories whose new items show in the Inbox, as owner/name separated
-      # by spaces. Each computer's starts empty.
-      secrets.attention-watch.key = "attention-watch/${config.dotfiles.host}";
-      # Accounts whose items and activity the Inbox skips, one GitHub login or
-      # pattern with * per line. A new computer's starts empty.
-      secrets.attention-ignore.key = "attention-ignore/${config.dotfiles.host}";
+      secrets = {
+        # The Pushover hook reads these on every computer.
+        pushover-user = { };
+        pushover-token = { };
+        # Each computer's Tailscale address, where its pair hub listens.
+        pair-hub-host.key = "pair-hub-host/${config.dotfiles.host}";
+        # Repositories whose new items show in the Inbox, as owner/name separated
+        # by spaces. Each computer's starts empty.
+        attention-watch.key = "attention-watch/${config.dotfiles.host}";
+        # Accounts whose items and activity the Inbox skips, one GitHub login or
+        # pattern with * per line. A new computer's starts empty.
+        attention-ignore.key = "attention-ignore/${config.dotfiles.host}";
+      };
     };
   };
 }

@@ -43,6 +43,7 @@ return {
         callback = function()
           ---@type integer[]
           local wins = {}
+          ---@type number
           local right = 0
           for _, win in ipairs(vim.api.nvim_list_wins()) do
             if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == "minifiles" then
@@ -65,7 +66,7 @@ return {
           end
           for _, win in ipairs(wins) do
             local config = vim.api.nvim_win_get_config(win)
-            config.col = config.col + shift
+            config.col = assert(tonumber(config.col)) + shift
             vim.api.nvim_win_set_config(win, config)
           end
         end,

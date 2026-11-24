@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json",
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "diagnostics": {
+    "enable": true,
+    "globals": [],
+    "severity": {
+      "need-check-nil": "error",
+      "param-type-mismatch": "error",
+      "return-type-mismatch": "error",
+      "unnecessary-if": "error",
+      "assign-type-mismatch": "error",
+      "inject-field": "error",
+      "redundant-return-value": "error",
+      "redundant-parameter": "error",
+      "unused": "error",
+      "redefined-local": "error",
+      "unreachable-code": "error",
+      "deprecated": "error"
+    }
+  }
+}

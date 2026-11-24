@@ -1,0 +1,19 @@
+id: python.no-sys-path
+language: Python
+severity: error
+message: Do not mutate `sys.path` at runtime.
+rule:
+  any:
+    - pattern: sys.path.insert($$$ARGS)
+    - pattern: sys.path.append($$$ARGS)
+metadata:
+  byor:
+    rationale: >
+      Mutating sys.path hides broken packaging, confuses type checkers, and
+      makes imports depend on execution order and working directory.
+    agent_prompt: >
+      Install the package in editable mode with uv (`uv run`) or declare script
+      dependencies with PEP 723 metadata instead of editing sys.path.
+    tags:
+      - python
+      - packaging

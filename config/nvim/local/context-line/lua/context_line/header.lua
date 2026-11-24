@@ -44,12 +44,24 @@ function M.bracket_pair(node)
     return nil, nil
   end
   local open, close = node:child(0), node:child(count - 1)
-  if PAIRS[open:type()] ~= close:type() then
+  if not open or not close or PAIRS[open:type()] ~= close:type() then
     return nil, nil
   end
   return open, close
 end
 local bracket_pair = M.bracket_pair
+
+---@param outer TSNode
+---@param after TSNode
+---@return TSNode?
+local function accessor_operand(outer, after)
+  local opened = outer ---@type TSNode?
+  while opened and not opened:prev_sibling() do
+    opened = opened:parent()
+  end
+  local before = opened and opened:prev_sibling()
+  return before and before:named() and after or nil
+end
 
 --- The node after `token` when `token` is punctuation between two parts of
 --- the node it belongs to, such as the `.` of `a.b`, rather than a prefix
@@ -65,8 +77,10 @@ local function infix_operand(token)
     return nil
   end
   local outer = token
-  while outer:parent() and outer:parent():child_count() == 1 do
-    outer = outer:parent() --[[@as TSNode]]
+  local parent = outer:parent()
+  while parent and parent:child_count() == 1 do
+    outer = parent
+    parent = outer:parent()
   end
   local after = outer:next_sibling()
   if not after or outer:prev_sibling() then
@@ -75,12 +89,7 @@ local function infix_operand(token)
   if not ACCESSORS[token:type()] then
     return nil
   end
-  local opened = outer ---@type TSNode?
-  while opened and not opened:prev_sibling() do
-    opened = opened:parent()
-  end
-  local before = opened and opened:prev_sibling()
-  return before and before:named() and after or nil
+  return accessor_operand(outer, after)
 end
 
 --- Whether nothing but comments follows `node` in its parent.
@@ -92,6 +101,85 @@ local function last_child(node)
     sibling = sibling:next_sibling()
   end
   return sibling == nil
+end
+
+---@param text string
+---@param bracket? "open"|"close"
+---@return ("open"|"close")?
+local function resolve_bracket(text, bracket)
+  if bracket then
+    return bracket
+  elseif OPENERS[text] then
+    return "open"
+  elseif CLOSERS[text] then
+    return "close"
+  end
+  return nil
+end
+
+---@param end_row integer?
+---@param end_col integer?
+---@param skipped_comment boolean
+---@param row integer
+---@param col integer
+---@return "none"|"space"|"break"
+local function compute_gap(end_row, end_col, skipped_comment, row, col)
+  if end_row and (skipped_comment or row > end_row) then
+    return "break"
+  elseif end_row and end_col and col > end_col then
+    return "space"
+  end
+  return "none"
+end
+
+---@param gap "none"|"space"|"break"
+---@param previous context_line.Chunk?
+---@param bracket? "open"|"close"
+---@return boolean
+local function should_drop_previous(gap, previous, bracket)
+  if gap ~= "break" or not previous then
+    return false
+  end
+  return previous.trailing == true or (bracket == "close" and TRAILING[previous.text] == true)
+end
+
+---@param chunk context_line.Chunk
+---@param text string
+---@param token? TSNode
+local function annotate_token(chunk, text, token)
+  if not token or token:named() then
+    return
+  end
+  local operand = infix_operand(token)
+  if operand then
+    chunk.infix = true
+    chunk.leads_name = not TRAILING[text] and operand:named() and operand:child_count() == 0 or nil
+  end
+  chunk.trailing = text == "," and last_child(token) or nil
+end
+
+---@param srow integer
+---@param scol integer
+---@param erow integer
+---@param ecol integer
+---@param first_row integer
+---@param last_row integer
+---@return boolean
+local function outside_header(srow, scol, erow, ecol, first_row, last_row)
+  return erow < first_row or srow > last_row or (srow == erow and scol == ecol)
+end
+
+---@param child TSNode
+---@param open TSNode?
+---@param close TSNode?
+---@return ("open"|"close")?
+local function child_bracket(child, open, close)
+  if child == open then
+    return "open"
+  elseif child == close then
+    return "close"
+  end
+  return nil
 end
 
 --- Splits the header rows into chunks: every token, and every run of
@@ -108,30 +196,19 @@ local function collect_chunks(top, lines, first_row)
 
   ---@param token? TSNode the token the text comes from
   local function add(row, col, text, bracket, token)
-    bracket = bracket or (OPENERS[text] and "open") or (CLOSERS[text] and "close") or nil
-    local gap = "none"
-    if end_row and (skipped_comment or row > end_row) then
-      gap = "break"
-    elseif end_row and col > end_col then
-      gap = "space"
-    end
+    bracket = resolve_bracket(text, bracket)
+    local gap = compute_gap(end_row, end_col, skipped_comment, row, col)
     -- A trailing comma or semicolon that ends a row before a closing
     -- bracket, or a comma that ends its list.
     local previous = chunks[#chunks]
-    if gap == "break" and previous and (previous.trailing or (bracket == "close" and TRAILING[previous.text])) then
+    if should_drop_previous(gap, previous, bracket) then
       table.remove(chunks)
     elseif gap == "none" and previous and previous.infix and text:find("^[%w_]") then
       previous.attached = true
     end
-    local chunk = { text = text, row = row, col = col, gap = gap, bracket = bracket } ---@type context_line.Chunk
-    if token and not token:named() then
-      local operand = infix_operand(token)
-      if operand then
-        chunk.infix = true
-        chunk.leads_name = not TRAILING[text] and operand:named() and operand:child_count() == 0 or nil
-      end
-      chunk.trailing = text == "," and last_child(token) or nil
-    end
+    ---@type context_line.Chunk
+    local chunk = { text = text, row = row, col = col, gap = gap, bracket = bracket }
+    annotate_token(chunk, text, token)
     chunks[#chunks + 1] = chunk
     end_row, end_col, skipped_comment = row, col + #text, false
   end
@@ -140,7 +217,7 @@ local function collect_chunks(top, lines, first_row)
   -- the region from (row1, col1) to (row2, col2).
   local function each_row(row1, col1, row2, col2, each)
     for row = math.max(row1, first_row), math.min(row2, last_row) do
-      local line = lines[row - first_row + 1]
+      local line = lines[row - first_row + 1] or ""
       local from = row == row1 and col1 or 0
       local to = row == row2 and col2 or #line
       each(row, from, line:sub(from + 1, to))
@@ -176,7 +253,7 @@ local function collect_chunks(top, lines, first_row)
   ---@param bracket? "open"|"close"
   local function walk(node, bracket)
     local srow, scol, erow, ecol = node:range()
-    if erow < first_row or srow > last_row or (srow == erow and scol == ecol) then
+    if outside_header(srow, scol, erow, ecol, first_row, last_row) then
       return
     end
     if node:type():find("comment", 1, true) then
@@ -194,7 +271,7 @@ local function collect_chunks(top, lines, first_row)
       if crow > row or (crow == row and ccol > col) then
         add_words(row, col, crow, ccol)
       end
-      walk(child, (child == open and "open") or (child == close and "close") or nil)
+      walk(child, child_bracket(child, open, close))
       row, col = cerow, cecol
     end
     add_words(row, col, erow, ecol)
@@ -231,7 +308,7 @@ local function last_comma_in(list, last_row)
   if list:start() >= last_row then
     return nil
   end
-  local comma, before_item
+  local comma, before_item ---@type TSNode?, TSNode?
   for item in list:iter_children() do
     if item:start() > last_row then
       break
@@ -242,6 +319,51 @@ local function last_comma_in(list, last_row)
     end
   end
   return before_item
+end
+
+---@param child TSNode
+---@param kind string
+---@return boolean
+local function is_named_item(child, kind)
+  return child:named() and not kind:find("comment", 1, true)
+end
+
+---@param opened { open: TSNode, item?: TSNode }[]
+---@param lists context_line.List[]
+---@param child TSNode
+---@param kind string
+local function track_paren_list(opened, lists, child, kind)
+  local innermost = opened[#opened]
+  if kind == "(" then
+    opened[#opened + 1] = { open = child }
+  elseif kind == ")" and innermost then
+    opened[#opened] = nil
+    if innermost.item and names_list(innermost.item:type()) then
+      lists[#lists + 1] = { open = innermost.open, close = child }
+    end
+  elseif innermost and not innermost.item and is_named_item(child, kind) then
+    innermost.item = child
+  end
+end
+
+---@param child TSNode
+---@param field string?
+---@param kind string
+---@param last_row integer
+---@return context_line.List?
+local function bracketed_list(child, field, kind, last_row)
+  local open, close = bracket_pair(child)
+  if not (open and close and (names_list(kind) or (field ~= nil and names_list(field)))) then
+    return nil
+  end
+  if close:start() > last_row then
+    close = last_comma_in(child, last_row)
+  end
+  if not close then
+    return nil
+  end
+  local main = field == "parameters" or field == "arguments"
+  return { open = open, close = close, main = main or nil }
 end
 
 --- The parameter and argument lists among the children of `node`: bracketed
@@ -260,26 +382,11 @@ local function lists_in(node, last_row)
     if child:start() > last_row then
       break
     end
-    local kind, innermost = child:type(), opened[#opened]
-    if kind == "(" then
-      opened[#opened + 1] = { open = child }
-    elseif kind == ")" and innermost then
-      opened[#opened] = nil
-      if innermost.item and names_list(innermost.item:type()) then
-        lists[#lists + 1] = { open = innermost.open, close = child }
-      end
-    elseif innermost and not innermost.item and child:named() and not kind:find("comment", 1, true) then
-      innermost.item = child
-    end
-    local open, close = bracket_pair(child)
-    if open and close and (names_list(kind) or (field ~= nil and names_list(field))) then
-      if close:start() > last_row then
-        close = last_comma_in(child, last_row)
-      end
-      if close then
-        local main = field == "parameters" or field == "arguments"
-        lists[#lists + 1] = { open = open, close = close, main = main or nil }
-      end
+    local kind = child:type()
+    track_paren_list(opened, lists, child, kind)
+    local list = bracketed_list(child, field, kind, last_row)
+    if list then
+      lists[#lists + 1] = list
     end
   end
   return lists
@@ -289,6 +396,26 @@ end
 ---@return boolean
 local function names_parameters(name)
   return (name:find("parameter") or name:find("formal")) ~= nil
+end
+
+---@param node TSNode
+---@param child TSNode
+---@param first TSNode
+---@param last TSNode
+---@return boolean
+local function is_foldable_braces(node, child, first, last)
+  return first:type() == "{"
+    and last:type() == "}"
+    and not (names_parameters(child:type()) or names_parameters(node:type()))
+end
+
+---@param child TSNode
+---@param first TSNode
+---@param last TSNode
+---@param count integer
+---@return boolean
+local function is_foldable_string(child, first, last, count)
+  return child:type():find("string") ~= nil and count >= 2 and first:child_count() == 0 and last:child_count() == 0
 end
 
 --- The children of `node` that span rows and are a bracketed body of a
@@ -311,19 +438,52 @@ local function folded_in(node, last_row)
     local first, last = child:child(0), child:child(count - 1)
     if srow ~= erow and first and last then
       local is_body = field == "body" and bracket_pair(child) ~= nil
-      local is_braces = first:type() == "{"
-        and last:type() == "}"
-        and not (names_parameters(child:type()) or names_parameters(node:type()))
-      local is_string = child:type():find("string") ~= nil
-        and count >= 2
-        and first:child_count() == 0
-        and last:child_count() == 0
-      if is_body or is_braces or is_string then
+      if is_body or is_foldable_braces(node, child, first, last) or is_foldable_string(child, first, last, count) then
         folded[#folded + 1] = { open = first, close = last }
       end
     end
   end
   return folded
+end
+
+---@param found { list: context_line.List, depth: integer, byte: integer }[]
+---@param seen table<string, true?>
+---@param parent { node: TSNode, depth: integer }
+---@param pairs_in fun(node: TSNode, last_row: integer): context_line.List[]
+---@param first_row integer
+---@param last_row integer
+---@return integer depth
+local function record_pairs(found, seen, parent, pairs_in, first_row, last_row)
+  local own_open, own_close = bracket_pair(parent.node)
+  local depth = parent.depth + (own_open and 1 or 0)
+  for _, list in ipairs(pairs_in(parent.node, last_row)) do
+    local open_row, _, byte = list.open:start()
+    local _, _, close_row = list.close:range()
+    if open_row >= first_row and close_row <= last_row and not seen[list.open:id()] then
+      seen[list.open:id()] = true
+      -- A node's own brackets, such as a Kotlin primary constructor's, are
+      -- not around the list they hold.
+      local own = list.open == own_open and list.close == own_close
+      found[#found + 1] = { list = list, depth = own and parent.depth or depth, byte = byte }
+    end
+  end
+  return depth
+end
+
+---@param queue { node: TSNode, depth: integer }[]
+---@param node TSNode
+---@param depth integer
+---@param first_row integer
+---@param last_row integer
+local function enqueue_children(queue, node, depth, first_row, last_row)
+  for child in node:iter_children() do
+    local srow, _, erow = child:range()
+    if srow > last_row then
+      break
+    elseif erow >= first_row then
+      queue[#queue + 1] = { node = child, depth = depth }
+    end
+  end
 end
 
 --- The bracket pairs that `pairs_in` finds among the children of nodes in
@@ -339,31 +499,12 @@ end
 ---@param pairs_in fun(node: TSNode, last_row: integer): context_line.List[]
 ---@return context_line.List[]
 local function inner_lists(top, first_row, last_row, pairs_in)
-  local found, seen = {}, {} ---@type { list: context_line.List, depth: integer, byte: integer }[], table<string, true>
+  local found, seen = {}, {} ---@type { list: context_line.List, depth: integer, byte: integer }[], table<string, true?>
   local queue, index = { { node = top, depth = 0 } }, 1
   while queue[index] do
     local parent = queue[index]
-    local own_open, own_close = bracket_pair(parent.node)
-    local depth = parent.depth + (own_open and 1 or 0)
-    for _, list in ipairs(pairs_in(parent.node, last_row)) do
-      local open_row, _, byte = list.open:start()
-      local _, _, close_row = list.close:range()
-      if open_row >= first_row and close_row <= last_row and not seen[list.open:id()] then
-        seen[list.open:id()] = true
-        -- A node's own brackets, such as a Kotlin primary constructor's, are
-        -- not around the list they hold.
-        local own = list.open == own_open and list.close == own_close
-        found[#found + 1] = { list = list, depth = own and parent.depth or depth, byte = byte }
-      end
-    end
-    for child in parent.node:iter_children() do
-      local srow, _, erow = child:range()
-      if srow > last_row then
-        break
-      elseif erow >= first_row then
-        queue[#queue + 1] = { node = child, depth = depth }
-      end
-    end
+    local depth = record_pairs(found, seen, parent, pairs_in, first_row, last_row)
+    enqueue_children(queue, parent.node, depth, first_row, last_row)
     index = index + 1
   end
   table.sort(found, function(a, b)
@@ -402,7 +543,8 @@ end
 local function join(indent, chunks)
   local parts, cols, length = { indent }, {}, #indent
   for i, chunk in ipairs(chunks) do
-    local sep = i > 1 and separator(chunks[i - 1], chunk) or ""
+    local previous = i > 1 and chunks[i - 1] or nil
+    local sep = previous and separator(previous, chunk) or ""
     cols[i] = length + #sep
     parts[#parts + 1] = sep .. chunk.text
     length = cols[i] + #chunk.text
@@ -419,14 +561,13 @@ local function before(row, col, other_row, other_col)
   return row < other_row or (row == other_row and col < other_col)
 end
 
---- Replaces the chunks between a list's brackets with one ellipsis.
 ---@param chunks context_line.Chunk[]
 ---@param list context_line.List
----@return boolean collapsed
-local function collapse_list(chunks, list)
+---@return integer? first, integer? last
+local function list_chunk_span(chunks, list)
   local _, _, open_row, open_col = list.open:range()
   local close_row, close_col = list.close:start()
-  local first, last
+  local first, last ---@type integer?, integer?
   for i, chunk in ipairs(chunks) do
     local inside = not before(chunk.row, chunk.col, open_row, open_col)
       and before(chunk.row, chunk.col, close_row, close_col)
@@ -434,16 +575,26 @@ local function collapse_list(chunks, list)
       first, last = first or i, i
     end
   end
-  if not first or (first == last and chunks[first].text == ELLIPSIS) then
+  return first, last
+end
+
+--- Replaces the chunks between a list's brackets with one ellipsis.
+---@param chunks context_line.Chunk[]
+---@param list context_line.List
+---@return boolean collapsed
+local function collapse_list(chunks, list)
+  local first, last = list_chunk_span(chunks, list)
+  local start = first and chunks[first]
+  if not first or not last or not start or (first == last and start.text == ELLIPSIS) then
     return false
   end
-  local start = chunks[first]
   for _ = first, last do
     table.remove(chunks, first)
   end
   table.insert(chunks, first, { text = ELLIPSIS, row = start.row, col = start.col, gap = "none", added = true })
-  if chunks[first + 1] then
-    chunks[first + 1].gap = "none"
+  local next_chunk = chunks[first + 1]
+  if next_chunk then
+    next_chunk.gap = "none"
   end
   return true
 end
@@ -518,6 +669,117 @@ local function truncate(text, width)
   return vim.endswith(kept, ELLIPSIS) and kept or kept .. ELLIPSIS
 end
 
+---@param chunk context_line.Chunk
+---@param srow integer
+---@param scol integer
+---@param erow integer
+---@param ecol integer
+---@return integer from, integer to
+local function chunk_overlap(chunk, srow, scol, erow, ecol)
+  local chunk_end = chunk.col + #chunk.text
+  local from = chunk.row == srow and math.max(scol, chunk.col) or chunk.col
+  local to = chunk.row == erow and math.min(ecol, chunk_end) or chunk_end
+  return from, to
+end
+
+---@param marks context_line.Mark[]
+---@param chunks context_line.Chunk[]
+---@param cols integer[]
+---@param hl_group string
+---@param range Range6
+---@param priority integer
+local function add_capture_marks(marks, chunks, cols, hl_group, range, priority)
+  local srow, scol, erow, ecol = range[1], range[2], range[4], range[5]
+  for i, chunk in ipairs(chunks) do
+    local col = cols[i]
+    if col and not chunk.added and chunk.row >= srow and chunk.row <= erow then
+      local from, to = chunk_overlap(chunk, srow, scol, erow, ecol)
+      if to > from then
+        marks[#marks + 1] = {
+          col = col + from - chunk.col,
+          end_col = col + to - chunk.col,
+          hl_group = hl_group,
+          priority = priority,
+        }
+      end
+    end
+  end
+end
+
+---@param marks context_line.Mark[]
+---@param parser vim.treesitter.LanguageTree
+---@param bufnr integer
+---@param chunks context_line.Chunk[]
+---@param cols integer[]
+---@param first_row integer
+---@param last_row integer
+local function collect_treesitter_marks(marks, parser, bufnr, chunks, cols, first_row, last_row)
+  parser:for_each_tree(function(tstree, langtree)
+    local lang = langtree:lang()
+    local query = vim.treesitter.query.get(lang, "highlights")
+    if not query then
+      return
+    end
+    for id, node, metadata in query:iter_captures(tstree:root(), bufnr, first_row, last_row + 1) do
+      local name = query.captures[id]
+      if name and name:sub(1, 1) ~= "_" then
+        local range = vim.treesitter.get_range(node, bufnr, metadata[id])
+        local meta_priority = tonumber(metadata.priority)
+        local priority = meta_priority and math.floor(meta_priority) or vim.hl.priorities.treesitter
+        add_capture_marks(marks, chunks, cols, "@" .. name .. "." .. lang, range, priority)
+      end
+    end
+  end)
+end
+
+---@param marks context_line.Mark[]
+---@param col_base integer
+---@param chunk context_line.Chunk
+---@param token table
+---@param ft string
+---@param base integer
+local function add_semantic_token_marks(marks, col_base, chunk, token, ft, base)
+  local chunk_end = chunk.col + #chunk.text
+  local from = token.line < chunk.row and chunk.col or math.max(token.start_col, chunk.col)
+  local to = token.end_line > chunk.row and chunk_end or math.min(token.end_col, chunk_end)
+  if to <= from then
+    return
+  end
+  local function add(group, delta)
+    marks[#marks + 1] = {
+      col = col_base + from - chunk.col,
+      end_col = col_base + to - chunk.col,
+      hl_group = group,
+      priority = base + delta,
+    }
+  end
+  add(("@lsp.type.%s.%s"):format(token.type, ft), 0)
+  for modifier in pairs(token.modifiers) do
+    add(("@lsp.mod.%s.%s"):format(modifier, ft), 1)
+    add(("@lsp.typemod.%s.%s.%s"):format(token.type, modifier, ft), 2)
+  end
+end
+
+---@param marks context_line.Mark[]
+---@param bufnr integer
+---@param chunks context_line.Chunk[]
+---@param cols integer[]
+local function collect_lsp_marks(marks, bufnr, chunks, cols)
+  -- The language server's colors, for names it knows more about than
+  -- Treesitter does, such as a parameter used in a function's body. They
+  -- outrank Treesitter's colors at the priorities Neovim gives them.
+  local ft = vim.bo[bufnr].filetype
+  local base = vim.hl.priorities.semantic_tokens
+  for i, chunk in ipairs(chunks) do
+    local col = cols[i]
+    if col and not chunk.added then
+      for _, token in ipairs(vim.lsp.semantic_tokens.get_at_pos(bufnr, chunk.row, chunk.col) or {}) do
+        add_semantic_token_marks(marks, col, chunk, token, ft, base)
+      end
+    end
+  end
+end
+
 --- Highlights for the chunks from the buffer's Treesitter highlight queries
 --- and its language server, ranked so a later capture beats an earlier one
 --- of the same priority, as in Neovim's own highlighter.
@@ -530,65 +792,8 @@ end
 ---@return context_line.Mark[]
 local function highlight_chunks(parser, bufnr, chunks, cols, first_row, last_row)
   local marks = {} ---@type context_line.Mark[]
-  parser:for_each_tree(function(tstree, langtree)
-    local lang = langtree:lang()
-    local query = vim.treesitter.query.get(lang, "highlights")
-    if not query then
-      return
-    end
-    for id, node, metadata in query:iter_captures(tstree:root(), bufnr, first_row, last_row + 1) do
-      local name = query.captures[id]
-      if name:sub(1, 1) ~= "_" then
-        local range = vim.treesitter.get_range(node, bufnr, metadata[id])
-        local srow, scol, erow, ecol = range[1], range[2], range[4], range[5]
-        for i, chunk in ipairs(chunks) do
-          if not chunk.added and chunk.row >= srow and chunk.row <= erow then
-            local chunk_end = chunk.col + #chunk.text
-            local from = chunk.row == srow and math.max(scol, chunk.col) or chunk.col
-            local to = chunk.row == erow and math.min(ecol, chunk_end) or chunk_end
-            if to > from then
-              marks[#marks + 1] = {
-                col = cols[i] + from - chunk.col,
-                end_col = cols[i] + to - chunk.col,
-                hl_group = "@" .. name .. "." .. lang,
-                priority = tonumber(metadata.priority) or vim.hl.priorities.treesitter,
-              }
-            end
-          end
-        end
-      end
-    end
-  end)
-
-  -- The language server's colors, for names it knows more about than
-  -- Treesitter does, such as a parameter used in a function's body. They
-  -- outrank Treesitter's colors at the priorities Neovim gives them.
-  local ft = vim.bo[bufnr].filetype
-  local base = vim.hl.priorities.semantic_tokens
-  for i, chunk in ipairs(chunks) do
-    if not chunk.added then
-      local chunk_end = chunk.col + #chunk.text
-      for _, token in ipairs(vim.lsp.semantic_tokens.get_at_pos(bufnr, chunk.row, chunk.col) or {}) do
-        local from = token.line < chunk.row and chunk.col or math.max(token.start_col, chunk.col)
-        local to = token.end_line > chunk.row and chunk_end or math.min(token.end_col, chunk_end)
-        if to > from then
-          local function add(group, delta)
-            marks[#marks + 1] = {
-              col = cols[i] + from - chunk.col,
-              end_col = cols[i] + to - chunk.col,
-              hl_group = group,
-              priority = base + delta,
-            }
-          end
-          add(("@lsp.type.%s.%s"):format(token.type, ft), 0)
-          for modifier in pairs(token.modifiers) do
-            add(("@lsp.mod.%s.%s"):format(modifier, ft), 1)
-            add(("@lsp.typemod.%s.%s.%s"):format(token.type, modifier, ft), 2)
-          end
-        end
-      end
-    end
-  end
+  collect_treesitter_marks(marks, parser, bufnr, chunks, cols, first_row, last_row)
+  collect_lsp_marks(marks, bufnr, chunks, cols)
 
   local order = {} ---@type table<context_line.Mark, integer>
   for i, mark in ipairs(marks) do
@@ -633,7 +838,8 @@ end
 function M.line(parser, bufnr, block, width)
   local first_row, last_row = block.start_row, block.last_row
   local lines = vim.api.nvim_buf_get_lines(bufnr, first_row, last_row + 1, false)
-  local leading = lines[1]:match("^%s*")
+  local first_line = lines[1] or ""
+  local leading = first_line:match("^%s*") or ""
   local indent = string.rep(" ", indent_width(leading, vim.bo[bufnr].tabstop))
 
   local root = block.node:tree():root()

@@ -11,11 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	tea "github.com/charmbracelet/bubbletea"
-
 	"workspace/kitty"
 	"workspace/popup"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // themeChoice is a computer's mascot and the Catppuccin accent its colors
@@ -50,7 +49,7 @@ func accentColor() string {
 	if err != nil || c.Accent == "" {
 		return ""
 	}
-	data, err := os.ReadFile(os.Getenv("WS_PALETTE"))
+	data, err := os.ReadFile(os.Getenv("WS_PALETTE")) //nolint:gosec // reads Catppuccin palette path set by Nix wrapper in WS_PALETTE
 	type flavor struct {
 		Colors map[string]struct{ Hex string }
 	}
@@ -104,7 +103,9 @@ func spritePreview(img image.Image, w int, term kitty.Terminal) string {
 	crop := image.NewNRGBA(image.Rect(0, 0, box.Dx(), box.Dy()))
 	draw.Draw(crop, crop.Bounds(), img, box.Min, draw.Src)
 	var data bytes.Buffer
-	png.Encode(&data, crop)
+	if err := png.Encode(&data, crop); err != nil {
+		return drawSprite(img, w, w/2)
+	}
 	rows := min(20, w/2)
 	cols := min(w, max(1, 2*rows*box.Dx()/box.Dy()))
 	// Centered in the pane, below a blank line.
@@ -129,67 +130,78 @@ func themePopup(term kitty.Terminal) popup.Popup {
 	}
 	return popup.Popup{
 		Noun: "modes and mascots", OneLine: true,
-		Tabs: tabs,
-		Load: func(t int, _ func([]popup.Row)) ([]popup.Row, error) {
-			c, err := readTheme()
-			if err != nil {
-				return nil, err
-			}
-			current := func(r popup.Row, on bool) popup.Row {
-				if on {
-					r.Tag = popup.Accent.SetString("current")
-				}
-				return r
-			}
-			if t == 0 {
-				return []popup.Row{
-					current(popup.Row{ID: "mode:dark", Title: "Dark", Data: mode("dark")}, themeMode() == "dark"),
-					current(popup.Row{ID: "mode:light", Title: "Light", Data: mode("light")}, themeMode() == "light"),
-				}, nil
-			}
-			kind := kinds[t-1] // Mode comes before the mascots' tabs
-			var ids []string
-			if kind == "local" {
-				for _, f := range locals {
-					ids = append(ids, filepath.Base(f))
-				}
-			} else {
-				ids, err = pokemonNames()
-			}
-			// The current mascot leads its tab.
-			var rows []popup.Row
-			for _, id := range ids {
-				name := kind + ":" + id
-				r := current(popup.Row{ID: name, Title: id, Data: name}, name == c.Mascot)
-				if name == c.Mascot {
-					rows = append([]popup.Row{r}, rows...)
-				} else {
-					rows = append(rows, r)
-				}
-			}
-			return rows, err
-		},
-		Fetch: func(r popup.Row) (any, error) {
-			name, ok := r.Data.(string)
-			if !ok {
-				return "Enter switches macOS and every app to " + r.Title + ".", nil
-			}
-			m, err := fetchMascot(name)
-			if err != nil {
-				return nil, err
-			}
-			return loadPNG(m.sprite)
-		},
-		Body: func(_ popup.Row, d any, w int) string { return spritePreview(d.(image.Image), w, term) },
-		Actions: []popup.Action{{Key: "enter", Help: "apply", Run: func(r popup.Row) tea.Cmd {
-			return tea.Batch(popup.Say("switching to "+r.Title+"…"), popup.Do(func() error {
-				if m, ok := r.Data.(mode); ok {
-					// The theme command flips macOS and every app.
-					_, err := runIn("", "theme", string(m))
-					return err
-				}
-				return setMascot(r.Data.(string))
-			}, popup.Reload("switched to "+r.Title)))
-		}}},
+		Tabs:    tabs,
+		Load:    func(t int, _ func([]popup.Row)) ([]popup.Row, error) { return loadThemeRows(t, kinds, locals) },
+		Fetch:   fetchThemePreview,
+		Body:    func(_ popup.Row, d any, w int) string { return spritePreview(d.(image.Image), w, term) },
+		Actions: []popup.Action{{Key: "enter", Help: "apply", Run: applyThemeRow}},
 	}
+}
+
+func tagCurrent(r popup.Row, on bool) popup.Row {
+	if on {
+		r.Tag = popup.Accent.SetString("current")
+	}
+	return r
+}
+
+func loadThemeRows(t int, kinds, locals []string) ([]popup.Row, error) {
+	c, err := readTheme()
+	if err != nil {
+		return nil, err
+	}
+	if t == 0 {
+		return []popup.Row{
+			tagCurrent(popup.Row{ID: "mode:dark", Title: "Dark", Data: mode("dark")}, themeMode() == "dark"),
+			tagCurrent(popup.Row{ID: "mode:light", Title: "Light", Data: mode("light")}, themeMode() == "light"),
+		}, nil
+	}
+	kind := kinds[t-1] // Mode comes before the mascots' tabs
+	ids, err := mascotIDs(kind, locals)
+	// The current mascot leads its tab.
+	var rows []popup.Row
+	for _, id := range ids {
+		name := kind + ":" + id
+		r := tagCurrent(popup.Row{ID: name, Title: id, Data: name}, name == c.Mascot)
+		if name == c.Mascot {
+			rows = append([]popup.Row{r}, rows...)
+		} else {
+			rows = append(rows, r)
+		}
+	}
+	return rows, err
+}
+
+func mascotIDs(kind string, locals []string) ([]string, error) {
+	if kind != "local" {
+		return pokemonNames()
+	}
+	ids := make([]string, len(locals))
+	for i, f := range locals {
+		ids[i] = filepath.Base(f)
+	}
+	return ids, nil
+}
+
+func fetchThemePreview(r popup.Row) (any, error) {
+	name, ok := r.Data.(string)
+	if !ok {
+		return "Enter switches macOS and every app to " + r.Title + ".", nil
+	}
+	m, err := fetchMascot(name)
+	if err != nil {
+		return nil, err
+	}
+	return loadPNG(m.sprite)
+}
+
+func applyThemeRow(r popup.Row) tea.Cmd {
+	return tea.Batch(popup.Say("switching to "+r.Title+"…"), popup.Do(func() error {
+		if m, ok := r.Data.(mode); ok {
+			// The theme command flips macOS and every app.
+			_, err := runIn("", "theme", string(m))
+			return err
+		}
+		return setMascot(r.Data.(string))
+	}, popup.Reload("switched to "+r.Title)))
 }

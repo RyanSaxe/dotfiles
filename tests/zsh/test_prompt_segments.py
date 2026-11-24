@@ -66,9 +66,7 @@ def make_repo(home: Path, path: Path) -> Path:
     return path
 
 
-def segments(
-    home: Path, cwd: Path, extra: dict[str, str] | None = None
-) -> dict[str, str]:
+def segments(home: Path, cwd: Path, *, extra: dict[str, str] | None = None) -> dict[str, str]:
     result = subprocess.run(
         [DASH, str(SCRIPT)],
         cwd=cwd,
@@ -96,7 +94,7 @@ def test_shallow_repo_parent_stays_whole(tmp_path: Path) -> None:
 def test_deleted_directory_shows_only_where_it_was(tmp_path: Path) -> None:
     home = make_home(tmp_path)
     gone = home / "a/b/c/d/gone"
-    assert segments(home, Path("/"), {"_PROMPT_GONE": str(gone)}) == {
+    assert segments(home, Path("/"), extra={"_PROMPT_GONE": str(gone)}) == {
         "DIR_PLAIN": "~/…/c/d",
         "GONE": "gone",
     }

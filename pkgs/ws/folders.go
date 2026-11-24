@@ -7,12 +7,11 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"workspace/mux"
+	"workspace/popup"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-
-	"workspace/mux"
-	"workspace/popup"
 )
 
 // A place is a folder, a place it's open in, or both, with the pane going
@@ -252,7 +251,7 @@ func folderSummary(dir string) string {
 func activity(dir string) time.Time {
 	gitDir := filepath.Join(dir, ".git")
 	// A worktree's .git is a file naming its folder in the main checkout's.
-	if data, err := os.ReadFile(gitDir); err == nil {
+	if data, err := os.ReadFile(gitDir); err == nil { //nolint:gosec // reads local .git pointer file in discovered repo
 		if named, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "gitdir: "); ok {
 			gitDir = named
 			if !filepath.IsAbs(named) {
@@ -260,7 +259,7 @@ func activity(dir string) time.Time {
 			}
 		}
 	}
-	info, err := os.Stat(filepath.Join(gitDir, "logs", "HEAD"))
+	info, err := os.Stat(filepath.Join(gitDir, "logs", "HEAD")) //nolint:gosec // stats local git HEAD reflog in discovered repo
 	if err != nil {
 		return time.Time{}
 	}
@@ -281,8 +280,10 @@ func repos() []string {
 // that hold no projects. Go's module cache in ~/go would add about 140 ms, so
 // GOPATH keeps it in ~/.local/share/go.
 func walkRepos(found func([]string)) {
-	skip := map[string]bool{"Library": true, filepath.Base(worktreeRoot): true, "node_modules": true,
-		"Applications": true, "Movies": true, "Music": true, "Pictures": true}
+	skip := map[string]bool{
+		"Library": true, filepath.Base(worktreeRoot): true, "node_modules": true,
+		"Applications": true, "Movies": true, "Music": true, "Pictures": true,
+	}
 	subfolders := func(dir string) []string {
 		entries, _ := os.ReadDir(dir)
 		var dirs []string

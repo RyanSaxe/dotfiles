@@ -119,7 +119,8 @@ local function is_anchored_sidebar(win)
   if vim.w[win].snacks_win then
     return false
   end
-  if vim.api.nvim_win_get_config(win).relative ~= "" then
+  local relative = vim.api.nvim_win_get_config(win).relative --[[@as string]]
+  if relative ~= "" then
     return false
   end
   local buf = vim.api.nvim_win_get_buf(win)

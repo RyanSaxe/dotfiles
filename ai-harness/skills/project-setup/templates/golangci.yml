@@ -1,0 +1,36 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+
+linters:
+  default: standard
+  enable:
+    - cyclop
+    - gocognit
+    - nestif
+    - revive
+    - gosec
+    - errcheck
+    - errorlint
+    - staticcheck
+  settings:
+    # Go's `if err != nil` checks add cyclomatic branches, so cyclop <= 10
+    # paired with gocognit <= 15 matches Python C901 <= 8 and Rust cognitive <= 15.
+    cyclop:
+      max-complexity: 10
+    gocognit:
+      min-complexity: 15
+    nestif:
+      min-complexity: 4
+    revive:
+      rules:
+        - name: argument-limit
+          arguments: [5]
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false

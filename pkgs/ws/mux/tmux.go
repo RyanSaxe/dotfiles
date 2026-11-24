@@ -9,7 +9,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
 	"workspace/kitty"
 	"workspace/layout"
 )
@@ -56,28 +55,38 @@ func (Tmux) Snapshot() (Snapshot, error) {
 	}
 	var s Snapshot
 	for line := range strings.SplitSeq(out, "\n") {
-		f := strings.SplitN(line, "\t", 11)
-		if len(f) < 11 {
+		session, p, ok := parseTmuxPane(line, processes)
+		if !ok {
 			continue
 		}
-		id := "=" + f[0] // = matches the name exactly
-		if !slices.ContainsFunc(s.Sessions, func(s Session) bool { return s.ID == id }) {
-			s.Sessions = append(s.Sessions, Session{id, f[0]})
-		}
-		p := Pane{Session: id, Label: f[0], ID: f[2], Tab: f[8], TabName: f[9], Focused: strings.HasSuffix(f[1], "1"), Landing: f[1] == "11",
-			Program: f[4], Folder: f[5], Status: Open, Title: f[10]}
-		if pid, err := strconv.Atoi(f[3]); err == nil && processes.runsAgent(pid) {
-			activity, _ := strconv.ParseInt(f[7], 10, 64)
-			p.Updated = time.Unix(activity, 0)
-			p.Status = Idle
-			if time.Since(p.Updated) < working {
-				p.Status = Working
-			}
-			p.NeedsYou = f[6] == "1"
+		if !slices.ContainsFunc(s.Sessions, func(cur Session) bool { return cur.ID == session.ID }) {
+			s.Sessions = append(s.Sessions, session)
 		}
 		s.Panes = append(s.Panes, p)
 	}
 	return s, err
+}
+
+func parseTmuxPane(line string, processes processTree) (Session, Pane, bool) {
+	f := strings.SplitN(line, "\t", 11)
+	if len(f) < 11 {
+		return Session{}, Pane{}, false
+	}
+	id := "=" + f[0] // = matches the name exactly
+	p := Pane{
+		Session: id, Label: f[0], ID: f[2], Tab: f[8], TabName: f[9], Focused: strings.HasSuffix(f[1], "1"), Landing: f[1] == "11",
+		Program: f[4], Folder: f[5], Status: Open, Title: f[10],
+	}
+	if pid, err := strconv.Atoi(f[3]); err == nil && processes.runsAgent(pid) {
+		activity, _ := strconv.ParseInt(f[7], 10, 64)
+		p.Updated = time.Unix(activity, 0)
+		p.Status = Idle
+		if time.Since(p.Updated) < working {
+			p.Status = Working
+		}
+		p.NeedsYou = f[6] == "1"
+	}
+	return Session{id, f[0]}, p, true
 }
 
 // Follow calls changed every few seconds and never returns, since tmux tells
@@ -153,7 +162,7 @@ func (t Tmux) Show(p Place) error {
 	if err != nil {
 		return err
 	}
-	return syscall.Exec(bin, []string{"tmux", "attach-session", "-t", p.Session}, os.Environ())
+	return syscall.Exec(bin, []string{"tmux", "attach-session", "-t", p.Session}, os.Environ()) //nolint:gosec // attaches terminal to tmux binary resolved via LookPath
 }
 
 // Tab names the window after the place when the place's tabs are named, so

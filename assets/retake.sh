@@ -93,7 +93,7 @@ build_demo() {
   aged "$demo/code/atlas/.git/logs/HEAD" 12
   demo_git -C "$demo/code/atlas" worktree add -q -b fix-login "$demo/worktrees/atlas/fix-login"
   aged "$demo/code/atlas/.git/worktrees/fix-login/logs/HEAD" 40
-  echo "~/notes" >"$demo/.config/ws/bookmarks"
+  printf '%s/notes\n' '~' >"$demo/.config/ws/bookmarks"
 
   # Watching is a tab only on a computer that watches repositories.
   echo "example/tide" >"$demo/.config/sops-nix/secrets/attention-watch"
@@ -288,7 +288,7 @@ open_popup() {
     layout = rex.layout.block({ flavor = 'com.superlogical.terminal.shell', label = '$label',
       options = { command = { $command }, cwd = '$demo/code/atlas' } }) })
     if err ~= nil then error(err, 0) end"
-  rex do -s "$session" -b "$code" -e "$lua" >/dev/null
+  rex "do" -s "$session" -b "$code" -e "$lua" >/dev/null
   for _ in $(seq 1 40); do
     sleep 0.5
     block=$(labeled_block "$label")
@@ -331,13 +331,14 @@ calm() {
 # shot that would show another app, the Wi-Fi network's name or a frozen Rex.
 capture() {
   local raw=$scratch/shot.png width file
-  rex -C "$app" do client.notice.dismiss >/dev/null 2>&1 || true # Rex's "Update installed" notice
+  rex -C "$app" "do" client.notice.dismiss >/dev/null 2>&1 || true # Rex's "Update installed" notice
   sketchybar --set wifi label="Wi-Fi"
   calm
   sleep 1
   [ "$(aerospace list-workspaces --focused)" = code ] || stop "the code workspace lost focus"
-  [ -z "$(aerospace list-windows --workspace code --format '%{app-bundle-id}' | grep -v '^com.superlogical.rex$')" ] ||
+  if aerospace list-windows --workspace code --format '%{app-bundle-id}' | grep -qv '^com.superlogical.rex$'; then
     stop "another app's window is on the code workspace, and would be in the shot"
+  fi
   [ "$(aerospace list-windows --focused --format '%{app-bundle-id}')" = com.superlogical.rex ] || stop "Rex lost focus to another app"
   [ "$(app_client)" = "$app" ] || stop "Rex's app stopped answering. Relaunch Rex yourself, then run this again"
   screencapture -x -m "$raw"
@@ -377,7 +378,7 @@ shoot_popup() {
 # it stops the programs it started.
 restore() {
   local pane
-  [ -z "$shown" ] || rex -C "$app" do session.select session_id="$shown" >/dev/null 2>&1 || true
+  [ -z "$shown" ] || rex -C "$app" "do" session.select session_id="$shown" >/dev/null 2>&1 || true
   aerospace workspace "$workspace" || true
   for pane in $code $note; do
     rex send-key -s "$session" -b "$pane" escape >/dev/null 2>&1 || true
@@ -434,7 +435,7 @@ note=$(rex block ls -s "$session" --json | jq -r --arg code "$code" '[.blocks[] 
 # first.
 aerospace workspace code
 sleep 1
-rex -C "$app" do session.select session_id="$session" >/dev/null
+rex -C "$app" "do" session.select session_id="$session" >/dev/null
 aerospace focus --window-id "${window%%|*}"
 sleep 2
 [ "$(app_client)" = "$app" ] || stop "Rex's app stopped answering. Relaunch Rex yourself, then run this again"

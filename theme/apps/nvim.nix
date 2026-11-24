@@ -21,10 +21,8 @@
         fg_muted = t.muted;
         fg_faint = t.faint;
         ghost = t.faint;
-        border = t.border;
-        warn = t.warn;
+        inherit (t) border warn info;
         success = t.ok;
-        info = t.info;
       };
       palette = c // {
         inherit (t) chrome;

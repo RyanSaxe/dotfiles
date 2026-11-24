@@ -65,41 +65,59 @@ func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: reloading, failed: retrying, updating: updating, updatingPicking: updatingPicking, reloading: reloading, retrying: retrying}[t.state]
 		return tabLoad{state: state, gen: t.gen + 1, err: t.err}, dropRows
 	case tabShown:
-		switch {
-		case e.gen != t.gen:
-			return t, dropRows
-		case t.state == reloading:
-			return t, holdRows
-		case t.state == picking || t.state == updatingPicking:
-			return tabLoad{state: updatingPicking, gen: t.gen}, showAndPick
-		}
-		return tabLoad{state: updating, gen: t.gen}, showRows
+		return t.onShown(e.gen)
 	case pickEarly:
-		switch t.state {
-		case firstLoad:
-			return tabLoad{state: picking, gen: t.gen}, dropRows
-		case updating:
-			return tabLoad{state: updatingPicking, gen: t.gen}, dropRows
-		}
+		return t.onPickEarly(), dropRows
 	case keyPressed:
-		switch t.state {
-		case picking:
-			return tabLoad{state: firstLoad, gen: t.gen}, dropRows
-		case updatingPicking:
-			return tabLoad{state: updating, gen: t.gen}, dropRows
-		}
+		return t.onKeyPressed(), dropRows
 	case tabDone:
-		switch {
-		case e.gen != t.gen:
-			return t, dropRows
-		case e.err != nil:
-			return tabLoad{state: failed, gen: t.gen, err: e.err}, dropRows
-		case t.state == picking || t.state == updatingPicking:
-			return tabLoad{state: loaded, gen: t.gen}, showAndPick
-		}
-		return tabLoad{state: loaded, gen: t.gen}, showRows
+		return t.onDone(e)
 	}
 	return t, dropRows
+}
+
+func (t tabLoad) onShown(gen int) (tabLoad, rowsEffect) {
+	switch {
+	case gen != t.gen:
+		return t, dropRows
+	case t.state == reloading:
+		return t, holdRows
+	case t.state == picking || t.state == updatingPicking:
+		return tabLoad{state: updatingPicking, gen: t.gen}, showAndPick
+	}
+	return tabLoad{state: updating, gen: t.gen}, showRows
+}
+
+func (t tabLoad) onPickEarly() tabLoad {
+	switch t.state {
+	case firstLoad:
+		return tabLoad{state: picking, gen: t.gen}
+	case updating:
+		return tabLoad{state: updatingPicking, gen: t.gen}
+	}
+	return t
+}
+
+func (t tabLoad) onKeyPressed() tabLoad {
+	switch t.state {
+	case picking:
+		return tabLoad{state: firstLoad, gen: t.gen}
+	case updatingPicking:
+		return tabLoad{state: updating, gen: t.gen}
+	}
+	return t
+}
+
+func (t tabLoad) onDone(e tabDone) (tabLoad, rowsEffect) {
+	switch {
+	case e.gen != t.gen:
+		return t, dropRows
+	case e.err != nil:
+		return tabLoad{state: failed, gen: t.gen, err: e.err}, dropRows
+	case t.state == picking || t.state == updatingPicking:
+		return tabLoad{state: loaded, gen: t.gen}, showAndPick
+	}
+	return tabLoad{state: loaded, gen: t.gen}, showRows
 }
 
 func (t tabLoad) showsRows() bool {
@@ -178,15 +196,19 @@ func (d detail) next(e detailEvent) (detail, effect) {
 			return detail{state: fetching, gen: d.gen, since: d.since}, fetch
 		}
 	case fetched:
-		switch {
-		case d.state != fetching || e.gen != d.gen:
-			return d, nothing
-		case e.err != nil:
-			return detail{state: missing, gen: d.gen, err: e.err}, nothing
-		}
-		return detail{state: shown, gen: d.gen, data: e.data}, nothing
+		return d.onFetched(e), nothing
 	}
 	return d, nothing
+}
+
+func (d detail) onFetched(e fetched) detail {
+	if d.state != fetching || e.gen != d.gen {
+		return d
+	}
+	if e.err != nil {
+		return detail{state: missing, gen: d.gen, err: e.err}
+	}
+	return detail{state: shown, gen: d.gen, data: e.data}
 }
 
 // Where a tab's cursor goes when its rows change. It stays on the top row,
@@ -282,21 +304,9 @@ func (dismiss) isFooterEvent()    {}
 
 // next moves the footer on, and hands back the question an answer goes to.
 func (f footer) next(e footerEvent) (footer, *askMsg) {
-	after := func() footer { // what shows once a question closes
-		if f.text != "" {
-			return footer{state: notice, text: f.text}
-		}
-		return footer{}
-	}
 	switch e := e.(type) {
 	case say:
-		switch {
-		case f.state == asking:
-			return footer{state: asking, text: e.text, q: f.q}, nil
-		case e.text == "":
-			return footer{}, nil
-		}
-		return footer{state: notice, text: e.text}, nil
+		return f.onSay(e.text), nil
 	case ask:
 		return footer{state: asking, text: f.text, q: e.q}, nil
 	case keyPressed:
@@ -305,12 +315,29 @@ func (f footer) next(e footerEvent) (footer, *askMsg) {
 		}
 	case answer:
 		if f.state == asking {
-			return after(), &f.q
+			return f.afterQuestion(), &f.q
 		}
 	case dismiss:
 		if f.state == asking {
-			return after(), nil
+			return f.afterQuestion(), nil
 		}
 	}
 	return f, nil
+}
+
+func (f footer) onSay(text string) footer {
+	if f.state == asking {
+		return footer{state: asking, text: text, q: f.q}
+	}
+	if text == "" {
+		return footer{}
+	}
+	return footer{state: notice, text: text}
+}
+
+func (f footer) afterQuestion() footer {
+	if f.text != "" {
+		return footer{state: notice, text: f.text}
+	}
+	return footer{}
 }

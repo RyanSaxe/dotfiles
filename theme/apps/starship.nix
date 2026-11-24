@@ -4,7 +4,7 @@
 { lib, t, ... }:
 let
   palette = {
-    faint = t.faint;
+    inherit (t) faint ok error;
     inherit (t.repo)
       folder
       branch
@@ -15,8 +15,6 @@ let
       dirty
       project
       ;
-    ok = t.ok;
-    error = t.error;
     caret = t.accent;
     caret_vi = t.code.structure;
   };

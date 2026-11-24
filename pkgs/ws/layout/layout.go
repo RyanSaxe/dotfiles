@@ -26,37 +26,53 @@ type Pane struct {
 // Load reads dir/NAME.toml, or builtins[name] when there is no such file,
 // and fills its {placeholders} from vars, each word quoted for the shell.
 func Load(dir, name string, builtins map[string]string, vars map[string][]string) ([]Pane, error) {
-	data, err := os.ReadFile(filepath.Join(dir, name+".toml"))
+	panes, err := readLayout(dir, name, builtins)
+	if err == nil {
+		err = fillPanes(panes, vars)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("layout %s: %w", name, err)
+	}
+	return panes, nil
+}
+
+func readLayout(dir, name string, builtins map[string]string) ([]Pane, error) {
+	data, err := os.ReadFile(filepath.Join(dir, name+".toml")) //nolint:gosec // reads local layout file from configured layouts dir
 	if builtin, ok := builtins[name]; ok && errors.Is(err, os.ErrNotExist) {
 		data, err = []byte(builtin), nil
 	}
+	if err != nil {
+		return nil, err
+	}
 	var l struct{ Pane []Pane }
-	if err == nil {
-		var md toml.MetaData
-		if md, err = toml.Decode(string(data), &l); err == nil && len(md.Undecoded()) > 0 {
-			err = fmt.Errorf("unknown key %s", md.Undecoded()[0])
-		}
+	md, err := toml.Decode(string(data), &l)
+	if err != nil {
+		return nil, err
 	}
-	if err == nil && len(l.Pane) == 0 {
-		err = errors.New("it has no [[pane]]")
+	if len(md.Undecoded()) > 0 {
+		return nil, fmt.Errorf("unknown key %s", md.Undecoded()[0])
 	}
+	if len(l.Pane) == 0 {
+		return nil, errors.New("it has no [[pane]]")
+	}
+	return l.Pane, nil
+}
+
+func fillPanes(panes []Pane, vars map[string][]string) error {
 	var pairs []string
 	for k, words := range vars {
 		pairs = append(pairs, k, Line(words))
 	}
 	fill := strings.NewReplacer(pairs...)
-	for i := range l.Pane {
-		p := &l.Pane[i]
+	for i := range panes {
+		p := &panes[i]
 		p.Run = strings.TrimSpace(fill.Replace(p.Run))
 		p.Split, p.Size = cmp.Or(p.Split, "right"), cmp.Or(p.Size, 50)
-		if !slices.Contains([]string{"right", "left", "above", "below"}, p.Split) && err == nil {
-			err = fmt.Errorf("split %q is not right, left, above or below", p.Split)
+		if !slices.Contains([]string{"right", "left", "above", "below"}, p.Split) {
+			return fmt.Errorf("split %q is not right, left, above or below", p.Split)
 		}
 	}
-	if err != nil {
-		return nil, fmt.Errorf("layout %s: %w", name, err)
-	}
-	return l.Pane, nil
+	return nil
 }
 
 // Line is words as one line the shell reads back as those words.

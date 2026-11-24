@@ -3,7 +3,7 @@
 {
   "ai-statusline-colors.js" = "module.exports = ${
     builtins.toJSON {
-      faint = t.faint;
+      inherit (t) faint;
       project = t.repo.project;
       branch = t.repo.branch;
       branchBehind = t.repo.behind;

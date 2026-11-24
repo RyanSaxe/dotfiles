@@ -3,7 +3,6 @@ package main
 import (
 	"slices"
 	"testing"
-
 	"workspace/mux"
 )
 

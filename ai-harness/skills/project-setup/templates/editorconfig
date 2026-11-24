@@ -22,3 +22,27 @@ max_line_length = 80
 # rumdl, in .rumdl.toml
 [*.md]
 max_line_length = 80
+
+# Rust: rustfmt
+[*.rs]
+indent_size = 4
+max_line_length = 100
+
+# Go: gofumpt and gofmt
+[*.go]
+indent_style = tab
+indent_size = 4
+max_line_length = 100
+
+# Lua: stylua, in stylua.toml
+[*.lua]
+indent_size = 2
+max_line_length = 120
+
+# Shell: shfmt -i 2
+[*.{sh,bash,zsh}]
+indent_size = 2
+
+# Nix: nixfmt
+[*.nix]
+indent_size = 2

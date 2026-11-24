@@ -5,7 +5,6 @@ import (
 	"slices"
 	"testing"
 	"time"
-
 	"workspace/mux"
 )
 
@@ -73,6 +72,32 @@ func TestAgentLevel(t *testing.T) {
 			t.Errorf("%s: the level is %q, want %q", c.name, got, c.want)
 		}
 	}
+}
+
+func walkRexJumps(t *testing.T, panes []mux.Pane, presses int) []string {
+	t.Helper()
+	state := slices.Clone(panes)
+	seenDone := map[string]bool{}
+	last := ""
+	var got []string
+	for range presses {
+		s := slices.Clone(state)
+		for i := range s {
+			if s[i].ID == last || seenDone[s[i].ID] {
+				s[i].NeedsYou = false
+			}
+		}
+		p, ok := nextAgent(mux.Snapshot{Panes: s}, last)
+		if !ok {
+			t.Fatalf("press after %q found no agent", last)
+		}
+		got = append(got, p.ID)
+		if p.Status == mux.Done {
+			seenDone[p.ID] = true
+		}
+		last = p.ID
+	}
+	return got
 }
 
 func TestNextAgent(t *testing.T) {
@@ -149,30 +174,6 @@ func TestNextAgent(t *testing.T) {
 	// Simulate repeated presses in Rex, where the pane you land on stops
 	// needing you while you look at it (and a done pane stays seen after you
 	// leave it, while a blocked one needs you again).
-	walk := func(panes []mux.Pane, presses int) []string {
-		state := slices.Clone(panes)
-		seenDone := map[string]bool{}
-		last := ""
-		var got []string
-		for range presses {
-			s := slices.Clone(state)
-			for i := range s {
-				if s[i].ID == last || seenDone[s[i].ID] {
-					s[i].NeedsYou = false
-				}
-			}
-			p, ok := nextAgent(mux.Snapshot{Panes: s}, last)
-			if !ok {
-				t.Fatalf("press after %q found no agent", last)
-			}
-			got = append(got, p.ID)
-			if p.Status == mux.Done {
-				seenDone[p.ID] = true
-			}
-			last = p.ID
-		}
-		return got
-	}
 	threeDone := []mux.Pane{
 		{ID: "done-1", Status: mux.Done, NeedsYou: true, Updated: at(1)},
 		{ID: "done-2", Status: mux.Done, NeedsYou: true, Updated: at(2)},
@@ -206,7 +207,7 @@ func TestNextAgent(t *testing.T) {
 			[]string{"blocked-1", "blocked-2", "blocked-3", "blocked-1"},
 		},
 	} {
-		if got := walk(c.panes, len(c.want)); !slices.Equal(got, c.want) {
+		if got := walkRexJumps(t, c.panes, len(c.want)); !slices.Equal(got, c.want) {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}

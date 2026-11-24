@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
 	"workspace/layout"
 )
 
@@ -27,12 +26,16 @@ func TestLoadFillsPlaceholders(t *testing.T) {
 
 func TestAFileReplacesABuiltin(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "agent.toml"), []byte("[[pane]]\nrun = \"codex\"\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "agent.toml"), []byte("[[pane]]\nrun = \"codex\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	panes, err := layout.Load(dir, "agent", builtins, nil)
 	if err != nil || len(panes) != 1 || panes[0].Run != "codex" {
 		t.Errorf("got %+v, %v, want the file's one codex pane", panes, err)
 	}
-	os.WriteFile(filepath.Join(dir, "bad.toml"), []byte("[[pane]]\nrun = \"x\"\nwidth = 3\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "bad.toml"), []byte("[[pane]]\nrun = \"x\"\nwidth = 3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := layout.Load(dir, "bad", builtins, nil); err == nil {
 		t.Error("a layout with an unknown key loaded")
 	}
@@ -50,7 +53,7 @@ func TestZshReadsQuotedWordsBackUnchanged(t *testing.T) {
 		"plain-word_1.2", "fix the 'bug' now", `say "hi" & don't stop`, "$(touch pwned) `id` $HOME",
 		"=ls", "~/notes", "a;b|c>d", "two\nlines", "",
 	} {
-		out, err := exec.Command(zsh, "-f", "-c", "printf %s "+layout.Quote(word)).Output()
+		out, err := exec.Command(zsh, "-f", "-c", "printf %s "+layout.Quote(word)).Output() //nolint:gosec // test verifies shell quoting against local zsh
 		if err != nil || string(out) != word {
 			t.Errorf("zsh read %q back as %q (%v)", word, out, err)
 		}
@@ -64,7 +67,7 @@ func TestZshReadsALineBackAsItsWords(t *testing.T) {
 	if err != nil {
 		t.Skip("zsh is not installed")
 	}
-	out, err := exec.Command(zsh, "-f", "-c", `printf '[%s]' `+layout.Line([]string{"--append-system-prompt", "", "fix it"})).Output()
+	out, err := exec.Command(zsh, "-f", "-c", `printf '[%s]' `+layout.Line([]string{"--append-system-prompt", "", "fix it"})).Output() //nolint:gosec // test verifies shell quoting against local zsh
 	if want := "[--append-system-prompt][][fix it]"; err != nil || string(out) != want {
 		t.Errorf("zsh read the line back as %s (%v), want %s", out, err, want)
 	}

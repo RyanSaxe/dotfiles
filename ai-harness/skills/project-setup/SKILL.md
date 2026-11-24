@@ -1,14 +1,19 @@
 ---
 name: project-setup
-description: Use when the user starts a new repository or project, or asks to bring an existing one in line with their setup, such as moving it off Prettier, ESLint or markdownlint. Sets up uv or npm, prek hooks, one CI workflow, the README and AGENTS.md, and for an existing repository lists the gaps first and fixes the ones the user approves, in one pull request.
+description: Use when the user starts a new repository or asks to clean up or bring an existing one in line with their setup across Python, Web/TypeScript/React, Markdown, Rust, Go, Lua, Notebooks, Shell and Nix, such as moving off Prettier, ESLint, Black, Flake8, mypy or markdownlint. Sets up toolchains, prek hooks, one CI workflow, BYOR packages, README and AGENTS.md, and runs a zero-ratchet cleanup audit and single PR for existing repositories.
 ---
 
 # Project setup
 
-This skill sets up a repository the way the user works. For a new project,
-ask the questions below, write the files, run the checks and open a pull
-request. For an existing project, list where it differs from the rules
-below, and change what the user approves in one pull request.
+This skill sets up a repository the way the user works across nine stacks:
+Python, Web/TypeScript/React, Markdown, Rust, Go, Lua, Notebooks, Shell and
+Nix. It has two modes:
+
+- **New project:** ask the questions below, write the files, run the checks and
+  open a pull request.
+- **Cleanup mode (zero-ratchet):** audit an existing repository with
+  `scripts/audit.py`, review the gap table with the user, and bring the
+  repository into line in one pull request with ordered atomic commits.
 
 ## Ask first
 
@@ -16,20 +21,20 @@ Ask these in one message, and skip any that the request or the repository
 already answers:
 
 1. Is the repository public or private, and which license does it use?
-2. What is it: a Python package or app, a web site, a Node CLI, notebooks,
-   or something else?
-3. Does it ship to other people's machines? If it does, which operating
-   systems and which Python or Node versions does CI test, and does a merge
-   release it or does a person?
-4. Does work land on main, or on develop, with release pull requests into
-   main?
-5. What may agents do here without asking, such as merge pull requests,
-   approve workflow runs or release?
+2. What is it: a Python package or app, a web site, a Node CLI, a Rust crate, a
+   Go module, a Lua project, notebooks, shell scripts, a Nix flake, or a mix?
+3. Does it ship to other people's machines? If it does, which operating systems
+   and language versions does CI test, and does a merge release it or does a
+   person?
+4. Does work land on main, or on develop, with release pull requests into main?
+5. What may agents do here without asking, such as merge pull requests, approve
+   workflow runs or release?
 
 ## Templates
 
-`templates/` holds the files to start from. Each is named without its
-leading dot, so that prek and the formatters don't read it here.
+`templates/` holds 11 starter files named without their leading dots so prek and
+formatters do not read them here. Every disabled rule or non-default choice
+carries a comment explaining why.
 
 | Template                 | Copy to                       | For           |
 | ------------------------ | ----------------------------- | ------------- |
@@ -40,17 +45,73 @@ leading dot, so that prek and the formatters don't read it here.
 | `pyproject.toml`         | the end of `pyproject.toml`   | Python        |
 | `oxfmtrc.json`           | `.oxfmtrc.json`               | web and Node  |
 | `oxlintrc.json`          | `.oxlintrc.json`              | web and Node  |
+| `cargo-lints.toml`       | the end of `Cargo.toml`       | Rust          |
+| `golangci.yml`           | `.golangci.yml`               | Go            |
+| `stylua.toml`            | `stylua.toml`                 | Lua           |
+| `emmyrc.json`            | `.emmyrc.json`                | Lua           |
 
-In the first three, blank lines separate the blocks. A block whose comment
-starts with a stack, such as `# Python` or `# Web`, is for that stack, and
-every other block is for every project. Keep the blocks the project needs
-and delete the rest.
+In `pre-commit-config.yaml`, `check.yml` and `editorconfig`, blank lines
+separate the blocks. A block whose comment starts with a stack, such as
+`# Python` or `# Rust`, is for that stack, and every other block is for every
+project. Keep the blocks the project needs and delete the rest.
 
-Then bring the pinned versions up to date. `prek update` moves each hook to
-its newest release. `check.yml` needs the newest prek, the newest major
-version of each action and the current Node LTS by hand.
-`gh api repos/OWNER/REPO/releases/latest` prints a repository's newest
+Bring pinned versions up to date after copying. `prek update` moves each hook to
+its newest release. Update `check.yml` pins (prek, GitHub Actions, Node LTS,
+`golangci-lint`, `stylua`, `emmylua_check`) and the `ast-grep-cli` version by
+hand. `gh api repos/OWNER/REPO/releases/latest` prints a repository's newest
 release.
+
+## Layer ownership
+
+Keep each concern in one layer so hooks, CI and agent feedback never duplicate
+or fight each other:
+
+- **prek and `check.yml`** own hard correctness, formatting, type checks,
+  lockfile freshness and the inline 1,000-line hard cap (`max-file-lines`) on
+  source files. When `.byor/rules/project/` exists, keep the pinned `ast-grep`
+  hook in `.pre-commit-config.yaml` so CI enforces repo-owned rules without
+  requiring BYOR on runners.
+- **BYOR** owns the agent edit loop (`--no-gate`, never `gate: true`). Wire
+  every project with the `craft` package plus its stack package when one exists
+  (`python` or `web`). The old `style` package is retired; replace it with
+  `craft` plus the stack package.
+
+## Cross-language parity standard
+
+Every stack enforces the same eight hygiene dimensions through its native
+tooling so quality does not drop when switching languages:
+
+- **Complexity:** small, flat functions calibrated per language's metric.
+- **Nesting depth:** capped at 4 levels (`PLR1702`, `max-depth`, `nestif`,
+  Clippy's quadratic cognitive penalty).
+- **Parameter cap:** short positional signatures (`PLR0917 <= 2` in Python,
+  `max-params <= 3` in JS/TS, `revive` `argument-limit: 5` in Go).
+- **Strict types:** `ty`, `oxlint-tsgolint` (`"strict": true`), `rustc`,
+  `go`/`staticcheck`, strict `emmylua_check`.
+- **Control-flow hygiene:** no shadowed bindings, redundant branches, implicit
+  coercion, or swallowed errors.
+- **Dead code:** unused bindings, unreachable code, and unused Nix inputs
+  (`deadnix --fail`).
+- **Formatting:** one canonical formatter per stack, auto-fixing in hooks.
+- **Lockfiles:** committed and verified in hooks (`uv.lock`,
+  `package-lock.json`, `Cargo.lock`, `go.sum`, `flake.lock`).
+
+### Complexity equivalence across languages
+
+Raw thresholds differ because each analyzer counts different constructs:
+
+- **Python (`C901 <= 8`, `PLR0912 <= 10`, `PLR1702 <= 4`):** 6 is the
+  human-ideal ceiling and >10 is poor; 8 is the agent-assisted benchmark.
+  Ruff's `C901` ignores boolean `and`/`or`.
+- **JS/TS (`complexity <= 10`, `max-depth <= 4`, `max-nested-callbacks <= 3`):**
+  `oxlint` counts `&&`, `||`, `??` and `?:`, so 10 matches Python's 8.
+- **Go (`cyclop <= 10`, `gocognit <= 15`, `nestif <= 4`):** accounts for
+  idiomatic `if err != nil` branches alongside cognitive complexity.
+- **Rust (`clippy::cognitive_complexity <= 15` via `clippy.toml`):** quadratic
+  nesting penalty makes 15 equivalent to ~8-10 cyclomatic complexity.
+- **Lua (`luacheck --no-config --only 561 --max-cyclomatic-complexity 10`):**
+  runs in ~0.23s for complexity alone and pairs with strict `emmylua_check`;
+  skip `selene` and full `luacheck` static analysis.
 
 ## Python
 
@@ -60,58 +121,127 @@ Run Python through uv only, with `uv run`, `uv add` and `uv sync`, never
 
 For a package or an app:
 
-1. Run `uv init --lib` for a library, or `uv init --package` for an app or
-   a command-line tool. Each writes `src/<pkg>/`, `.python-version` and the
+1. Run `uv init --lib` for a library, or `uv init --package` for an app or a
+   command-line tool. Each writes `src/<pkg>/`, `.python-version` and the
    `uv_build` backend. For a tool that ships, set `requires-python` to the
    oldest Python that CI tests.
-2. Run `uv add --dev pytest ruff ty`, and add `tests/`. `uv.lock` is
-   committed.
-3. Append `templates/pyproject.toml` to `pyproject.toml`. It sets ruff's
-   line length to 120 and selects every rule, with a comment on each rule it
-   ignores. Give each ignore you add a comment of its own.
-4. Run `byor init --package style --no-gate`. byor's own skill covers the
-   details. The gate stays off because it adds a workflow and hooks beside
-   prek's.
+2. Run `uv add --dev pytest ruff ty`, and add `tests/`. Commit `uv.lock`;
+   `uv-lock-check` keeps it in sync with `pyproject.toml`.
+3. Append `templates/pyproject.toml` to `pyproject.toml`. It sets Ruff's line
+   length to 120, enables `select = ["ALL"]`, sets `C901 <= 8`, `PLR0912 <= 10`,
+   `PLR1702 <= 4`, caps positional parameters at two (`PLR0917` via
+   `max-positional-args = 2`), bans relative imports, and bans `typing.cast`,
+   `typing_extensions.cast`, `unittest`, `unittest.mock` and dynamic `importlib`
+   APIs via `TID251`. Give each ignore you add a comment of its own.
+4. Run `byor init --packages craft python --no-gate`.
 
-The `style` package holds the user's Python rules, so keep them out of the
-project's config and AGENTS.md. byor checks each file the agent edits, and
-`byor agent-check` checks the whole project, so run it before each commit.
-
-ruff formats, ruff lints with `--fix`, and ty checks types. A project needs
-no other Python check. Notebooks are committed without their outputs, which
-nbstripout removes, and ruff and ty check them too.
+Ruff formats and lints with `--fix`, and `ty` checks types. A project needs no
+other Python linter or type checker. Notebooks are committed without their
+outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 
 ## Web and Node
 
-- Use npm with a committed `package-lock.json`, and set `"type": "module"`
-  in `package.json`.
-- Start from the framework's own scaffold, such as `npm create vite`, and
-  delete its demo files.
-- oxfmt formats and oxlint lints, in place of Prettier and ESLint. Install
-  them with `npm install --save-dev --save-exact oxfmt oxlint`.
-  `.oxfmtrc.json` keeps oxfmt off Markdown, which rumdl formats.
-- Code that goes through a build step is TypeScript with `"strict": true`,
-  and the template's `tsc` hook checks its types. A framework with its own
-  check, such as `astro check`, runs it from that hook instead.
-- `npm test` runs the tests, with `node --test` or the framework's own
-  runner, such as Vitest with Vite.
-- A framework's file type, such as `.astro`, goes in the `files` pattern of
-  each web hook. oxfmt skips the type unless `.oxfmtrc.json` turns it on,
-  as `"astro": true` does.
+- Use npm with a committed `package-lock.json`, and set `"type": "module"` in
+  `package.json`.
+- Start from the framework's own scaffold, such as `npm create vite`, and delete
+  its demo files.
+- `oxfmt` formats and `oxlint` lints, replacing Prettier and ESLint. Install
+  them with `npm install --save-dev --save-exact oxfmt oxlint`. `.oxfmtrc.json`
+  keeps `oxfmt` off Markdown, which `rumdl` formats.
+- `.oxlintrc.json` enables `typescript`, `unicorn`, `oxc` and `import` (add
+  `react` and `jsx-a11y` for React repos; drop `typescript` and its rules for
+  pure JS), sets `correctness`, `suspicious` and `perf` to `"error"`, and
+  enforces `complexity` (10), `max-depth` (4), `max-nested-callbacks` (3),
+  `max-params` (3), `curly`, `import/no-cycle`, `eqeqeq`, `no-var`,
+  `prefer-const`, `no-param-reassign`, `no-nested-ternary`, `no-else-return`,
+  `no-lonely-if`, `unicorn/no-negated-condition`, no `as` assertions, no `any`,
+  no `!` non-null assertions, exhaustive `switch` checks,
+  `typescript/no-misused-promises` and
+  `typescript/explicit-function-return-type`. CLI entrypoints may opt out of
+  `no-console`.
+- For TypeScript projects (`"strict": true`), install `oxlint-tsgolint` with
+  `--save-dev --save-exact` and add `--type-aware --type-check` to the `oxlint`
+  hook so `oxlint` checks types in place of a separate `tsc` hook. A framework
+  with its own checker, such as `astro check`, keeps a hook for that instead.
+- CLIs or test harnesses that intentionally await inside a loop may turn off
+  `no-await-in-loop` in `.oxlintrc.json` with a comment explaining why.
+- For static HTML sites or templates that need HTML lint rules beyond `oxfmt`,
+  install `markuplint` and keep the `# Static HTML` hook block.
+- `npm test` runs the tests, with `node --test` or the framework's own runner,
+  such as Vitest with Vite.
+- A framework's file type, such as `.astro`, goes in the `files` pattern of each
+  web hook. `oxfmt` skips the type unless `.oxfmtrc.json` turns it on, as
+  `"astro": true` does.
+- Run `byor init --packages craft web --no-gate`.
+
+## Rust
+
+- `cargo fmt --all` formats, `cargo clippy --all-targets -- -D warnings` lints,
+  and `cargo metadata --locked --format-version 1` verifies `Cargo.lock`.
+- Append `templates/cargo-lints.toml` to `Cargo.toml` (or place it under
+  `[workspace.lints.*]` in a workspace) to forbid `unsafe_code`, warn on
+  `clippy::pedantic` and `cognitive_complexity`, deny `unwrap_used` and warn on
+  `expect_used`. Add `cognitive-complexity-threshold = 15` in `clippy.toml`.
+- Run `cargo test --locked` in CI. For shipped crates, consider adding
+  `cargo machete` or `cargo deny check` to the CI `test` job.
+- Run `byor init --package craft --no-gate`.
+
+## Go
+
+- Copy `templates/golangci.yml` to `.golangci.yml`. It uses `golangci-lint` v2
+  with `gofumpt` and `goimports` under `formatters`, `standard` plus `cyclop`
+  (10), `gocognit` (15), `nestif` (4), `revive` (`argument-limit: 5`), `gosec`,
+  `errcheck`, `errorlint` and `staticcheck` under `linters`, and uncapped issue
+  reporting (`max-issues-per-linter: 0`, `max-same-issues: 0`,
+  `uniq-by-line: false`).
+- prek runs `golangci-lint fmt`, `golangci-lint run` and `go mod tidy -diff`. CI
+  installs `golangci-lint` with `install-only: true` so prek runs it once, and
+  runs `go test -race ./...`.
+- For a tiny single-package helper where `.golangci.yml` is overkill, use
+  `gofmt -w` and `go vet ./...` instead.
+- Run `byor init --package craft --no-gate`.
+
+## Lua
+
+- Copy `templates/stylua.toml` to `stylua.toml` and `templates/emmyrc.json` to
+  `.emmyrc.json` (switching `runtime.version` to `"Lua5.4"` for standalone Lua,
+  or adding host globals like `"vim"` for Neovim). `.emmyrc.json` promotes the
+  local type, nil-check, control-flow and dead-code diagnostics to `"error"`.
+- prek runs `stylua`, `emmylua_check .` and
+  `luacheck --no-config --only 561 --max-cyclomatic-complexity 10` (complexity
+  only; skip `selene` and full `luacheck` static analysis). Add `busted` or
+  `nvim --clean --headless` test commands to the CI `test` job when tests exist.
+- Run `byor init --package craft --no-gate`.
+
+## Shell
+
+- `shfmt --write --indent 2` formats POSIX sh, bash and dash scripts (excluding
+  `*.zsh`, since `shfmt` has no zsh dialect).
+- `shellcheck` lints every sh, bash and dash script; `zsh -n` checks syntax on
+  `*.zsh` files and scripts with a `zsh` shebang.
+- Give every executable or checked shell script an explicit shebang so tools
+  know its dialect without guessing.
+
+## Nix
+
+- `nixfmt` formats every `.nix` file.
+- `deadnix --fail` catches unused bindings and arguments.
+- `statix check` catches Nix anti-patterns and repeated attribute keys.
+- Keep `flake.lock` committed and run `nix build` / `nix eval` checks in CI.
 
 ## Every project
 
-- The dotfiles install uv, prek and Node on every computer. A tool that
-  only this project needs lives in the project: in the uv `dev` group, in
-  npm's `devDependencies` or in a prek hook. A project never gets its own
-  Nix flake.
-- rumdl formats and lints Markdown, and rewraps every paragraph at 80
-  columns. Its fixes change only layout, and it reports the rest. It
-  replaces markdownlint by choice, although one person wrote nearly all of
-  it.
-- Formatter settings live in the project's files, `pyproject.toml`,
-  `.oxfmtrc.json` and `.rumdl.toml`, which the hook and the editor both
-  read. `.editorconfig` mirrors their line lengths and indents.
+- The dotfiles install uv, prek, Node, Rust, Go and Lua formatters on every
+  computer. A tool that only one project needs lives in that project: in the uv
+  `dev` group, in npm's `devDependencies` or in a prek hook. A project never
+  gets its own Nix flake.
+- `rumdl` formats and lints Markdown, and rewraps every paragraph at 80 columns.
+  Its fixes change only layout, and it reports the rest. It replaces
+  `markdownlint`.
+- Formatter settings live in the project's own files (`pyproject.toml`,
+  `.oxfmtrc.json`, `.rumdl.toml`, `.golangci.yml`, `stylua.toml`), which both
+  hooks and editors read. `.editorconfig` mirrors their line lengths and
+  indents.
 - Commit messages follow Conventional Commits, such as
   `feat(cli): print the result as JSON`.
 - No dependency bots: no Dependabot or Renovate config.
@@ -121,44 +251,42 @@ nbstripout removes, and ruff and ty check them too.
 
 ## Hooks and CI
 
-- `.pre-commit-config.yaml` is the one list of checks. prek runs it before
-  each commit, and CI runs the same `prek run --all-files`.
-- The hooks only format and lint, and each formatter fixes the files instead
-  of only reporting them. Tests run in CI.
+- `.pre-commit-config.yaml` is the one list of checks. prek runs it before each
+  commit, and CI runs the same `prek run --all-files`.
+- Hooks only format and lint, and each formatter fixes files instead of only
+  reporting them. Tests run in CI.
 - Every hook and tool has a pinned version: a hook's `rev`, a version in
-  `uv.lock` or `package-lock.json`, or a version in `check.yml`.
-- Every rule a config turns off, and every exception, has a comment that
-  says why.
-- One workflow, `check.yml`, runs the checks and the tests, on pushes to
-  main and on pull requests. Its `check` job runs prek, and its other jobs
-  run the tests. It runs without manual approval.
-- A tool that ships to other people's machines runs its tests on every
-  operating system it supports, and on the oldest and the newest Python or
-  Node it supports, as a matrix in the `test` job.
-- A release publishes to PyPI or npm through trusted publishing, with
-  `id-token: write` and no token, from a `release.yml` that runs on a push
-  to main or by hand, as the user chose, and runs the tests before it
-  publishes. The user registers the workflow as a trusted publisher on PyPI
-  or npm, so ask them to.
-- With a develop branch, develop is the default branch, CI also runs on
-  pushes to it, and a release is a pull request from develop into main.
+  `uv.lock`, `package-lock.json` or `Cargo.lock`, or a version in `check.yml`.
+- Every rule a config turns off, and every exception, has a comment that says
+  why.
+- One workflow, `check.yml`, runs checks and tests on pushes to main and on pull
+  requests. Its `check` job runs prek, and its `test` job runs tests. It runs
+  without manual approval.
+- A tool that ships to other people's machines runs its tests on every operating
+  system it supports, and on the oldest and newest language versions it
+  supports, as a matrix in the `test` job.
+- A release publishes to PyPI, npm or crates.io through trusted publishing, with
+  `id-token: write` and no token, from a `release.yml` that runs on a push to
+  main or by hand, as the user chose, and runs tests before publishing. Ask the
+  user to register the trusted publisher.
+- With a develop branch, develop is the default branch, CI also runs on pushes
+  to it, and a release is a pull request from develop into main.
 
 ## Docs
 
-- The README sells the project to developers in one screen: a tagline, a
-  picture or a video, Get started, How it works with one diagram, links to
-  the docs, and the license. A feature gets no section of its own.
-  [pair's README](https://github.com/RyanSaxe/pair#readme) follows this
-  layout.
-- A diagram is a custom SVG with a light and a dark version in a
-  `<picture>`, never Mermaid. Add an image only where it helps.
+- The README sells the project to developers in one screen: a tagline, a picture
+  or a video, Get started, How it works with one diagram, links to the docs, and
+  the license. A feature gets no section of its own.
+  [pair's README](https://github.com/RyanSaxe/pair#readme) follows this layout.
+- A diagram is a custom SVG with a light and a dark version in a `<picture>`,
+  never Mermaid. Add an image only where it helps.
 - Leave out qualifiers and filler: no list of platforms when every platform
-  works, no status banners, and no features that don't exist yet.
+  works, no status banners, and no features that do not exist yet.
 - Longer docs go in `docs/`, in `getting-started/`, `concepts/`, `guides/`,
   `reference/` and `contributing/`, with `docs/README.md` as the index and
   images in `docs/assets/`.
-- The README is for using the project, and AGENTS.md is for changing it.
-  AGENTS.md has:
+- The README is for using the project, and `AGENTS.md` is for changing it.
+  `AGENTS.md` has:
   - the setup, the modules, and the project's own rules for the code and the
     tests
   - the exact check commands
@@ -167,56 +295,91 @@ nbstripout removes, and ruff and ty check them too.
   - that commit messages follow Conventional Commits
   - to ask before adding a dependency
   - to add no backwards-compatibility shims before the first release
-- Planned work that hasn't started goes in a committed `BACKLOG.md`, and
-  the pull request that does an entry removes it.
+
+  Do not put prose rules in `AGENTS.md` that linters or hooks already enforce,
+  and do not add a rule-to-enforcer table.
+- Planned work that has not started goes in a committed `BACKLOG.md`, and the
+  pull request that does an entry removes it.
 - Skills for working on this repository go in `.agents/skills/NAME/SKILL.md`.
 
-## Set up a new project
+## Mode 1: New project
 
-1. Ask the questions above.
-2. Unless the GitHub repository exists, create it with `gh repo create`,
-   public or private as the user said. Push a first commit to main, with
-   the license if it has one. `gh api licenses/mit --jq .body` prints the
-   MIT license, and other license IDs work the same way. With a develop
+1. Ask the questions in "Ask first".
+2. Unless the GitHub repository exists, create it with `gh repo create`, public
+   or private as the user said. Push a first commit to main, with the license if
+   it has one (`gh api licenses/mit --jq .body` prints MIT). With a develop
    branch, push develop at the same commit and make it the default with
-   `gh repo edit --default-branch develop`. Build the rest on a branch from
-   the default branch.
-3. Set up each stack's toolchain and `.gitignore`. Put the license in the
-   `license` field of `pyproject.toml` or `package.json`. Commit.
-4. Copy the templates, and stage everything with `git add`, since prek
-   checks only the files git knows. Run `prek install`, then
-   `prek run --all-files` until it passes, then the tests. Commit.
-5. Write the README's tagline, Get started and license, and add its
-   picture, diagram and docs links once there is something to show. Write
-   AGENTS.md. Commit.
+   `gh repo edit --default-branch develop`. Build the rest on a branch from the
+   default branch.
+3. Set up each stack's toolchain, `.gitignore` and BYOR (`--no-gate` with
+   `craft` plus stack packages). Put the license in `pyproject.toml`,
+   `package.json` or `Cargo.toml`. Commit.
+4. Copy the templates for the detected stacks, stage everything with `git add`
+   (since prek checks tracked files), run `prek install`, then
+   `prek run --all-files` until it passes, then run the tests. Commit.
+5. Write the README's tagline, Get started and license (add pictures, diagrams
+   and docs links once there is something to show) and write `AGENTS.md`.
+   Commit.
 6. For a project that ships, write `release.yml` and commit it.
 7. Open a pull request into the default branch.
 
-## Bring an existing project in line
+## Mode 2: Cleanup mode (zero-ratchet)
 
-1. Read the repository's config files, workflows, README, AGENTS.md and
-   docs, and compare them with each rule above.
-2. Ask the user what the repository doesn't answer.
-3. List the gaps in a table, with the files each one changes and how, and
-   ask the user which to fix.
-4. Fix the approved gaps on one branch, one commit each, and open one pull
-   request.
+Use this mode for any existing repository.
 
-To move a project off Prettier, ESLint or markdownlint, convert its config,
-then delete the old tool's config, its dependency and its CI steps:
+1. Run the read-only audit script first:
 
-- `npx oxfmt --migrate=prettier` writes `.oxfmtrc.json` from the Prettier
-  config and `.prettierignore`. oxfmt honors `prettier-ignore` comments, so
-  they stay.
+   ```sh
+   uv run --script <skill-dir>/scripts/audit.py /path/to/repo
+   ```
+
+   Pass `--json` when you want structured data. Read the repository's workflows,
+   config files, `README.md` and `AGENTS.md` alongside the audit output.
+
+2. Present the gap table to the user in one message, showing the files each
+   change touches and asking about anything ambiguous, including any intentional
+   misfit-rule overrides (such as `no-await-in-loop` in a CLI or keeping an
+   extra workflow).
+
+3. Enforce zero ratcheting: never add per-file legacy overrides, baselines or
+   ignore lists to defer violations. Fix every finding cleanly. If one oversized
+   or risky rule would force a large refactor outside the cleanup scope, keep
+   that rule out of the cleanup pull request and record a dedicated follow-up
+   item in `BACKLOG.md`.
+
+4. Land all approved changes on one branch in one pull request, using four
+   ordered atomic commits:
+   1. **Migrate tooling and wire BYOR:** convert and delete legacy tooling
+      configs, dependencies and hooks (Prettier, ESLint, Husky, lint-staged,
+      Biome, markdownlint, Black, isort, Flake8, pylint, mypy, pyright,
+      `.luacheckrc` / `selene`, Python `pre-commit`, Dependabot/Renovate).
+      Install the canonical tools and wire BYOR with `--no-gate` and `craft`
+      plus the stack packages.
+   2. **Pure reformat:** run only the formatters (`prek run` formatter hooks or
+      the formatters directly) with no logic edits. When the repository
+      preserves commit history, record this commit's SHA in
+      `.git-blame-ignore-revs`.
+   3. **Fix findings:** fix every remaining lint, type and 1,000-line file-cap
+      finding cleanly so `prek run --all-files`, `byor agent-check` and all
+      tests pass.
+   4. **Consolidate CI and docs:** consolidate `.github/workflows/check.yml` and
+      `.pre-commit-config.yaml`, update `AGENTS.md` (pruning prose rules tools
+      now enforce, with no rule-to-enforcer table), fill approved README/docs
+      gaps, and update branch ruleset required check names and any
+      `workflow_run` triggers when workflow or job names change.
+
+### Migrating off Prettier, ESLint and markdownlint
+
+Convert the existing config before deleting the old tool's config, dependency
+and CI steps:
+
+- `npx oxfmt --migrate=prettier` writes `.oxfmtrc.json` from the Prettier config
+  and `.prettierignore`. `oxfmt` honors `prettier-ignore` comments, so they
+  stay.
 - `npx @oxlint/migrate` writes `.oxlintrc.json` from the ESLint config.
 - `rumdl import FILE` writes `.rumdl.toml` from a markdownlint config.
 
-Then change each setting the template also has to the template's value, but
-add the template's `ignorePatterns` to the converted ones instead of
-replacing them, and keep the rest. Fix what a newly enabled rule finds, or
-turn the rule off with a comment saying why. Reformat the whole repository
-in a commit of its own, so that the other commits show only what they
-change.
-
-Renaming a workflow or a job changes the names that branch rulesets require
-and that `workflow_run` triggers name, so update those too.
+Then update each setting the template also sets to the template's value, merge
+the template's `ignorePatterns` with the converted ones instead of dropping
+them, and remove any per-file legacy suppression blocks rather than ratcheting
+them forward.

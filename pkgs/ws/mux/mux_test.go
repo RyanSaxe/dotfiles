@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 	"workspace/mux"
 )
 
@@ -34,13 +33,12 @@ func TestLabel(t *testing.T) {
 	}
 }
 
-// A tmux Snapshot lists each session and pane: the pane going to the session
-// lands on, the pane an agent runs in, and the folder each runs in. A window
-// named after a worktree is a place of its own, and the rest of its session
-// another.
-// The agent needs you once its window's bell rings where no client shows
-// it, and works while its window prints. Every other pane is Open.
-func TestATmuxSnapshot(t *testing.T) {
+type tmuxServer struct {
+	dir, socket, work string
+}
+
+func startTmuxServer(t *testing.T) tmuxServer {
+	t.Helper()
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux is not installed")
 	}
@@ -55,17 +53,9 @@ func TestATmuxSnapshot(t *testing.T) {
 	if err := os.Mkdir(filepath.Dir(socket), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	tmux := func(args ...string) string {
-		t.Helper()
-		out, err := exec.Command("tmux", append([]string{"-S", socket, "-f", "/dev/null"}, args...)...).CombinedOutput()
-		if err != nil {
-			t.Fatalf("tmux %v: %v %s", args, err, out)
-		}
-		return strings.TrimSpace(string(out))
-	}
 	t.Cleanup(func() {
-		exec.Command("tmux", "-S", socket, "kill-server").Run()
-		os.RemoveAll(dir)
+		_ = exec.Command("tmux", "-S", socket, "kill-server").Run() //nolint:gosec // stops throwaway test tmux server
+		_ = os.RemoveAll(dir)
 	})
 	t.Setenv("TMUX_TMPDIR", dir)
 	// A program run outside a terminal, as by launchd, gets no locale.
@@ -76,51 +66,46 @@ func TestATmuxSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmux("new-session", "-d", "-s", "api", "-c", work)
-	// The agents are tmux run through links named claude and agy, since ws
-	// knows an agent by the name it runs as, waiting on a channel nothing
-	// signals. opencode is no longer counted as an agent. macOS kills a copy
-	// of a system program, and nixpkgs' sleep is a link to coreutils, which
-	// picks its command by that name.
-	program, err := exec.LookPath("tmux")
+	return tmuxServer{dir: dir, socket: socket, work: work}
+}
+
+func (srv tmuxServer) run(t *testing.T, args ...string) string {
+	t.Helper()
+	out, err := exec.Command("tmux", append([]string{"-S", srv.socket, "-f", "/dev/null"}, args...)...).CombinedOutput() //nolint:gosec // invokes throwaway test tmux server
 	if err != nil {
+		t.Fatalf("tmux %v: %v %s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func (srv tmuxServer) linkAgent(t *testing.T, program, name string) string {
+	t.Helper()
+	path := filepath.Join(srv.dir, name)
+	if err := os.Symlink(program, path); err != nil {
 		t.Fatal(err)
 	}
-	link := func(name string) string {
-		path := filepath.Join(dir, name)
-		if err := os.Symlink(program, path); err != nil {
-			t.Fatal(err)
-		}
-		return path
-	}
-	claude, agy, opencode := link("claude"), link("agy"), link("opencode")
-	// The agent runs in a tab named after a worktree, beside a tab nobody
-	// named.
-	agent := tmux("new-window", "-d", "-t", "api:", "-n", "api/feature", "-c", work, "-P", "-F", "#{pane_id}",
-		`printf '\a'; exec `+claude+` -S `+socket+` wait-for never`)
-	tmux("split-window", "-d", "-t", agent, "-c", work)
-	agyPane := tmux("new-window", "-d", "-t", "api:", "-n", "api/agy", "-c", work, "-P", "-F", "#{pane_id}",
-		`exec `+agy+` -S `+socket+` wait-for never`)
-	tmux("new-session", "-d", "-s", "web", "-c", work)
-	// A tab named after no worktree stays part of its session, and opencode
-	// does not count as an agent.
-	tmux("new-window", "-d", "-t", "web:", "-n", "logs", "-c", work,
-		`exec `+opencode+` -S `+socket+` wait-for never`)
+	return path
+}
 
-	// tmux reads the bell from the pane's output a moment after it rings, and
-	// the agy pane's shell needs a moment to exec agy.
+func waitForTmuxSnapshot(t *testing.T, agyPane string) mux.Snapshot {
+	t.Helper()
 	backend := mux.Detect(func(string) string { return "" }, "")
 	var s mux.Snapshot
 	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		var err error
 		if s, err = backend.Snapshot(); err != nil {
 			t.Fatal(err)
 		}
 		rang := slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.NeedsYou })
 		agyUp := slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.ID == agyPane && p.Status != mux.Open })
 		if (rang && agyUp) || time.Now().After(deadline) {
-			break
+			return s
 		}
 	}
+}
+
+func checkTmuxLabels(t *testing.T, s mux.Snapshot) {
+	t.Helper()
 	var labels []string
 	for _, session := range s.Sessions {
 		labels = append(labels, session.Label)
@@ -135,26 +120,44 @@ func TestATmuxSnapshot(t *testing.T) {
 	if want := []string{"api", "api/feature", "api/agy", "web"}; !slices.Equal(places, want) {
 		t.Errorf("the places are %v, want %v", places, want)
 	}
+}
+
+func checkTmuxPlaces(t *testing.T, s mux.Snapshot, work, agent string) {
+	t.Helper()
+	checkTmuxLabels(t, s)
 	api, _ := s.Find("api")
-	lands, ok := s.Landing(api)
-	if !ok || lands.ID == agent || lands.Folder != work || api.Whole {
+	if lands, ok := s.Landing(api); !ok || lands.ID == agent || lands.Folder != work || api.Whole {
 		t.Errorf("going to api lands on %+v, want its first pane, in %s, and api is %+v, want the session less a tab", lands, work, api)
 	}
 	if web, _ := s.Find("web"); !web.Whole || len(web.Tabs) != 2 {
 		t.Errorf("web is %+v, want the whole session, its logs tab included", web)
 	}
+	checkTmuxFeaturePlace(t, s, agent)
+}
+
+func checkTmuxFeaturePlace(t *testing.T, s mux.Snapshot, agent string) {
+	t.Helper()
 	feature, _ := s.Find("api/feature")
 	if lands, ok := s.Landing(feature); !ok || lands.ID != agent || !feature.Named || len(feature.Tabs) != 1 {
 		t.Errorf("api/feature is %+v and lands on %+v, want its one named tab, landing on the agent", feature, lands)
 	}
-	i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.ID == agent })
+}
+
+func mustFindPane(t *testing.T, panes []mux.Pane, id string) mux.Pane {
+	t.Helper()
+	i := slices.IndexFunc(panes, func(p mux.Pane) bool { return p.ID == id })
 	if i < 0 {
-		t.Fatalf("the agent's pane, %s, is missing from %+v", agent, s.Panes)
+		t.Fatalf("pane %s is missing from %+v", id, panes)
 	}
-	if p := s.Panes[i]; !p.NeedsYou || p.Status != mux.Working {
+	return panes[i]
+}
+
+func checkTmuxAgents(t *testing.T, s mux.Snapshot, agent, agyPane string) {
+	t.Helper()
+	if p := mustFindPane(t, s.Panes, agent); !p.NeedsYou || p.Status != mux.Working {
 		t.Errorf("the agent that just rang reads %v, needing you %v, want working and needing you", p.Status, p.NeedsYou)
 	}
-	if j := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.ID == agyPane }); j < 0 || s.Panes[j].Status == mux.Open {
+	if p := mustFindPane(t, s.Panes, agyPane); p.Status == mux.Open {
 		t.Errorf("the agy pane %s wasn't counted as an agent in %+v", agyPane, s.Panes)
 	}
 	if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.ID != agent && p.ID != agyPane && (p.NeedsYou || p.Status != mux.Open) }) {
@@ -163,6 +166,45 @@ func TestATmuxSnapshot(t *testing.T) {
 	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Open, "api/agy": mux.Working, "api/feature": mux.Working, "web": mux.Open}) {
 		t.Errorf("the statuses are %v, want api/agy and api/feature working, and api and web open", got)
 	}
+}
+
+// A tmux Snapshot lists each session and pane: the pane going to the session
+// lands on, the pane an agent runs in, and the folder each runs in. A window
+// named after a worktree is a place of its own, and the rest of its session
+// another.
+// The agent needs you once its window's bell rings where no client shows
+// it, and works while its window prints. Every other pane is Open.
+func TestATmuxSnapshot(t *testing.T) {
+	srv := startTmuxServer(t)
+	srv.run(t, "new-session", "-d", "-s", "api", "-c", srv.work)
+	// The agents are tmux run through links named claude and agy, since ws
+	// knows an agent by the name it runs as, waiting on a channel nothing
+	// signals. opencode is no longer counted as an agent. macOS kills a copy
+	// of a system program, and nixpkgs' sleep is a link to coreutils, which
+	// picks its command by that name.
+	program, err := exec.LookPath("tmux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	claude, agy, opencode := srv.linkAgent(t, program, "claude"), srv.linkAgent(t, program, "agy"), srv.linkAgent(t, program, "opencode")
+	// The agent runs in a tab named after a worktree, beside a tab nobody
+	// named.
+	agent := srv.run(t, "new-window", "-d", "-t", "api:", "-n", "api/feature", "-c", srv.work, "-P", "-F", "#{pane_id}",
+		`printf '\a'; exec `+claude+` -S `+srv.socket+` wait-for never`)
+	srv.run(t, "split-window", "-d", "-t", agent, "-c", srv.work)
+	agyPane := srv.run(t, "new-window", "-d", "-t", "api:", "-n", "api/agy", "-c", srv.work, "-P", "-F", "#{pane_id}",
+		`exec `+agy+` -S `+srv.socket+` wait-for never`)
+	srv.run(t, "new-session", "-d", "-s", "web", "-c", srv.work)
+	// A tab named after no worktree stays part of its session, and opencode
+	// does not count as an agent.
+	srv.run(t, "new-window", "-d", "-t", "web:", "-n", "logs", "-c", srv.work,
+		`exec `+opencode+` -S `+srv.socket+` wait-for never`)
+
+	// tmux reads the bell from the pane's output a moment after it rings, and
+	// the agy pane's shell needs a moment to exec agy.
+	s := waitForTmuxSnapshot(t, agyPane)
+	checkTmuxPlaces(t, s, srv.work, agent)
+	checkTmuxAgents(t, s, agent, agyPane)
 }
 
 // A Rex agent needs you while it's blocked, and while it's failed or done
@@ -188,7 +230,7 @@ cat <<'EOF'
   {"session": "s:web", "label": "web", "id": "working", "status": "working", "updated": "2026-11-17T12:05:00-05:00", "shown": {}}
  ]}
 EOF`
-	if err := os.WriteFile(filepath.Join(bin, "rex"), []byte(script), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "rex"), []byte(script), 0o700); err != nil { //nolint:gosec // test writes executable fake rex shim to temp PATH
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))

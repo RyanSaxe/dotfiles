@@ -42,7 +42,8 @@ local function find_note(name)
   local function not_hidden(dir)
     return not vim.startswith(vim.fs.basename(dir), ".")
   end
-  for path, type in vim.fs.dir(vault, { depth = math.huge, skip = not_hidden }) do
+  local max_depth = math.huge --[[@as integer]]
+  for path, type in vim.fs.dir(vault, { depth = max_depth, skip = not_hidden }) do
     if type == "file" and vim.fs.basename(path) == name then
       return vault .. "/" .. path
     end
@@ -142,7 +143,8 @@ local function new_note()
       local target = root()
       vim.schedule(function()
         if not kind.prompt then
-          return vim.cmd.Obsidian("today")
+          vim.cmd.Obsidian("today")
+          return
         end
         vim.ui.input({ prompt = kind.prompt .. (target ~= "" and " in private/" or "") .. ": " }, function(input)
           if input and vim.trim(input) ~= "" then
@@ -163,7 +165,7 @@ local function project_name()
   local dir = (vim.bo.buftype == "" and file ~= "") and vim.fs.dirname(file) or vim.fn.getcwd()
   local function git(...)
     local result = vim.system({ "git", "-C", dir, ... }, { text = true }):wait()
-    return result.code == 0 and vim.trim(result.stdout) or nil
+    return result.code == 0 and vim.trim(result.stdout or "") or nil
   end
   local url = git("remote", "get-url", "origin")
   if url then

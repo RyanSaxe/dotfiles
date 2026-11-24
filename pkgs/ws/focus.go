@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"workspace/mux"
 )
 
@@ -145,7 +144,7 @@ func windowLabel(ws []window) (string, error) {
 	w, ok := pickWindow(ws)
 	i := strings.LastIndex(w.title, " - ")
 	if !ok || i < 0 {
-		return "", errors.New("Rex's window doesn't name a session")
+		return "", errors.New("the Rex window doesn't name a session")
 	}
 	return w.title[i+len(" - "):], nil
 }
@@ -200,7 +199,7 @@ func followFocus(changed func()) {
 				changed()
 			}
 		}
-		cmd.Wait()
+		_ = cmd.Wait()
 		time.Sleep(5 * time.Second)
 		if cur := focusedRex(); cur != prev {
 			prev = cur
@@ -219,14 +218,14 @@ func watched(b mux.Backend) mux.Backend {
 		return b
 	}
 	r.Shown = focusedRex()
-	readJSON("seen.json", &r.Seen)
+	_ = readJSON("seen.json", &r.Seen)
 	return r
 }
 
 // watchedRex is watched for Rex, given ws, Rex's windows.
 func watchedRex(r mux.Rex, ws []window) mux.Rex {
 	r.Shown, _ = windowLabel(ws)
-	readJSON("seen.json", &r.Seen)
+	_ = readJSON("seen.json", &r.Seen)
 	return r
 }
 
@@ -234,30 +233,9 @@ func watchedRex(r mux.Rex, ws []window) mux.Rex {
 // tabs or on Needs you, in the tmux client used last, starting Ghostty on
 // tmux's main session when no client is attached.
 func focusTmux(what string) error {
-	clients, _ := runIn("", "tmux", "list-clients", "-F", "#{client_activity} #{client_name}")
-	client := newestClient(clients)
-	if client == "" {
-		if _, err := runIn("", "open", "-n", "-b", ghosttyBundle, "--args", "-e", "tmux", "new-session", "-A", "-s", "main"); err != nil {
-			return err
-		}
-		err := waitFor(func() error {
-			clients, _ = runIn("", "tmux", "list-clients", "-F", "#{client_activity} #{client_name}")
-			if client = newestClient(clients); client == "" {
-				return errors.New("tmux didn't start in Ghostty")
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		ws, err := appWindows(ghosttyBundle)
-		if err == nil {
-			err = bringToCode(ghosttyBundle, ws)
-		}
-		if err != nil {
-			return err
-		}
+	client, err := ensureTmuxClient()
+	if err != nil {
+		return err
 	}
 	if what == "agent" {
 		t := mux.Tmux{Client: client}
@@ -272,6 +250,29 @@ func focusTmux(what string) error {
 	}
 	_, err = runIn("", "tmux", "display-popup", "-c", client, "-t", pane, "-d", "#{pane_current_path}", "-h", "80%", "-w", "90%", "-E", "ws pick "+what)
 	return err
+}
+
+func ensureTmuxClient() (string, error) {
+	clients, _ := runIn("", "tmux", "list-clients", "-F", "#{client_activity} #{client_name}")
+	if client := newestClient(clients); client != "" {
+		ws, err := appWindows(ghosttyBundle)
+		if err != nil {
+			return "", err
+		}
+		return client, bringToCode(ghosttyBundle, ws)
+	}
+	if _, err := runIn("", "open", "-n", "-b", ghosttyBundle, "--args", "-e", "tmux", "new-session", "-A", "-s", "main"); err != nil {
+		return "", err
+	}
+	var client string
+	err := waitFor(func() error {
+		clients, _ = runIn("", "tmux", "list-clients", "-F", "#{client_activity} #{client_name}")
+		if client = newestClient(clients); client == "" {
+			return errors.New("tmux didn't start in Ghostty")
+		}
+		return nil
+	})
+	return client, err
 }
 
 // bringToCode focuses the app's window on the code workspace, moving one

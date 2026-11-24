@@ -115,7 +115,7 @@ func agentSettings(agent string) (model, effort string, err error) {
 			EffortLevel string `json:"effortLevel"`
 		}
 		var data []byte
-		data, err = os.ReadFile(filepath.Join(cmp.Or(os.Getenv("CLAUDE_CONFIG_DIR"), filepath.Join(home, ".claude")), "settings.json"))
+		data, err = os.ReadFile(filepath.Join(cmp.Or(os.Getenv("CLAUDE_CONFIG_DIR"), filepath.Join(home, ".claude")), "settings.json")) //nolint:gosec // reads user's local Claude settings from CLAUDE_CONFIG_DIR or ~/.claude
 		if err == nil {
 			err = json.Unmarshal(data, &s)
 		}

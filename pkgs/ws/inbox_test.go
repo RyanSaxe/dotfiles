@@ -45,35 +45,53 @@ func TestTheFourReasons(t *testing.T) {
 		raw  string
 		want []reasonKind
 	}{
-		{"a reply owed on your pull request", `{"__typename": "PullRequest", "id": "1", "author": ` + me + `,
+		{
+			"a reply owed on your pull request", `{"__typename": "PullRequest", "id": "1", "author": ` + me + `,
 			"comments": {"nodes": [` + comment("c1", me, "2026-11-01T00:00:00Z", "done", false) + `, ` + comment("c2", alice, "2026-11-02T00:00:00Z", "one more thing", false) + `]}}`,
-			[]reasonKind{commented}},
-		{"you replied last", `{"__typename": "PullRequest", "id": "2", "author": ` + me + `,
+			[]reasonKind{commented},
+		},
+		{
+			"you replied last", `{"__typename": "PullRequest", "id": "2", "author": ` + me + `,
 			"comments": {"nodes": [` + comment("c1", alice, "2026-11-01T00:00:00Z", "question", false) + `, ` + comment("c2", me, "2026-11-02T00:00:00Z", "answer", false) + `]}}`,
-			nil},
-		{"a reaction counts as an answer", `{"__typename": "Issue", "id": "3", "author": ` + me + `,
+			nil,
+		},
+		{
+			"a reaction counts as an answer", `{"__typename": "Issue", "id": "3", "author": ` + me + `,
 			"comments": {"nodes": [` + comment("c1", alice, "2026-11-02T00:00:00Z", "fixed?", true) + `]}}`,
-			nil},
-		{"people talking where you never took part", `{"__typename": "PullRequest", "id": "4", "author": ` + alice + `,
+			nil,
+		},
+		{
+			"people talking where you never took part", `{"__typename": "PullRequest", "id": "4", "author": ` + alice + `,
 			"comments": {"nodes": [` + comment("c1", alice, "2026-11-02T00:00:00Z", "thoughts?", false) + `]}}`,
-			nil},
-		{"an @-mention brings you in", `{"__typename": "Issue", "id": "5", "author": ` + alice + `,
+			nil,
+		},
+		{
+			"an @-mention brings you in", `{"__typename": "Issue", "id": "5", "author": ` + alice + `,
 			"comments": {"nodes": [` + comment("c1", alice, "2026-11-02T00:00:00Z", "@ryansaxe can you look", false) + `]}}`,
-			[]reasonKind{commented}},
-		{"bots don't count", `{"__typename": "PullRequest", "id": "6", "author": ` + me + `,
+			[]reasonKind{commented},
+		},
+		{
+			"bots don't count", `{"__typename": "PullRequest", "id": "6", "author": ` + me + `,
 			"comments": {"nodes": [` + comment("c1", bot, "2026-11-02T00:00:00Z", "bump", false) + `]}}`,
-			nil},
-		{"red checks come first", `{"__typename": "PullRequest", "id": "7", "author": ` + me + `,
+			nil,
+		},
+		{
+			"red checks come first", `{"__typename": "PullRequest", "id": "7", "author": ` + me + `,
 			"comments": {"nodes": [` + comment("c1", alice, "2026-11-02T00:00:00Z", "nit", false) + `]},
 			"commits": {"nodes": [{"commit": {"oid": "abc", "statusCheckRollup": {"state": "FAILURE",
 				"contexts": {"nodes": [{"name": "lint", "conclusion": "FAILURE"}, {"name": "test", "conclusion": "SUCCESS"}]}}}}]}}`,
-			[]reasonKind{failing, commented}},
-		{"changes requested on yours", `{"__typename": "PullRequest", "id": "8", "author": ` + me + `,
+			[]reasonKind{failing, commented},
+		},
+		{
+			"changes requested on yours", `{"__typename": "PullRequest", "id": "8", "author": ` + me + `,
 			"reviews": {"nodes": [{"id": "r1", "state": "CHANGES_REQUESTED", "submittedAt": "2026-11-02T00:00:00Z", "author": ` + alice + `}]}}`,
-			[]reasonKind{changesRequested}},
-		{"a dismissed review doesn't", `{"__typename": "PullRequest", "id": "9", "author": ` + me + `,
+			[]reasonKind{changesRequested},
+		},
+		{
+			"a dismissed review doesn't", `{"__typename": "PullRequest", "id": "9", "author": ` + me + `,
 			"reviews": {"nodes": [{"id": "r1", "state": "DISMISSED", "submittedAt": "2026-11-02T00:00:00Z", "author": ` + alice + `}]}}`,
-			nil},
+			nil,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -102,8 +120,8 @@ func TestAcknowledgingLastsUntilSomethingNew(t *testing.T) {
 	if got := a.standing(newer); got != needsYou {
 		t.Fatalf("after a new comment: %v, want needsYou", got)
 	}
-	if got := a.standing(item{ID: "pr"}); got != clear {
-		t.Fatalf("with no reason left: %v, want clear", got)
+	if got := a.standing(item{ID: "pr"}); got != settled {
+		t.Fatalf("with no reason left: %v, want settled", got)
 	}
 	// A fresh inbox without the item drops what you acknowledged, so the same
 	// activity on an item that reopens needs you again.
@@ -161,11 +179,11 @@ func TestIgnoredAccountsAreSkipped(t *testing.T) {
 		n := node(t, raw)
 		author, _ := json.Marshal(n.Author)
 		search += `{"id": "` + id + `", "updatedAt": "` + n.UpdatedAt.Format(time.RFC3339) + `", "author": ` + string(author) + `},`
-		if err := os.WriteFile(filepath.Join(github, id+".node"), []byte(raw), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(github, id+".node"), []byte(raw), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(github, "search"), []byte(search[:len(search)-1]+`]}}}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(github, "search"), []byte(search[:len(search)-1]+`]}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	// A fake GitHub answers a search with every item, and a lookup with the
@@ -181,8 +199,10 @@ case "$4" in
   echo ']}}'
   ;;
 esac`)
-	before := inbox{Items: []item{{ID: "yours", Updated: time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC),
-		Reasons: []reason{{Kind: commented, Actor: "carol", Key: "c2"}}}}}
+	before := inbox{Items: []item{{
+		ID: "yours", Updated: time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC),
+		Reasons: []reason{{Kind: commented, Actor: "carol", Key: "c2"}},
+	}}}
 
 	in, err := fetchInbox(before, []string{"acme/web"}, []string{"carol", "*[bot]"}, now)
 	if err != nil {

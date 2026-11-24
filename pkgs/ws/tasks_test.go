@@ -2,13 +2,11 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
-
 	"workspace/kitty"
 	"workspace/layout"
 	"workspace/mux"
@@ -20,17 +18,17 @@ import (
 func writeNote(t *testing.T, vault, file, content string) {
 	t.Helper()
 	path := filepath.Join(vault, file)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func readNote(t *testing.T, vault, file string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(vault, file))
+	data, err := os.ReadFile(filepath.Join(vault, file)) //nolint:gosec // test helper reads file from temp directory
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,42 +202,69 @@ func TestATaskIsAddedAboveTheFirstBranch(t *testing.T) {
 	}
 }
 
+func makeTaskCheckout(t *testing.T, folder string, at time.Time) string {
+	t.Helper()
+	dir := filepath.Join(home, folder, "nix")
+	log := filepath.Join(dir, ".git", "logs", "HEAD")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	runGitSteps(t, dir, []string{"init", "-q"}, []string{"remote", "add", "origin", "git@github.com:someone/nix.git"})
+	writeNote(t, dir, ".git/logs/HEAD", "")
+	if err := os.Chtimes(log, at, at); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func checkTaskEnterOpens(t *testing.T, vault, id, want string) {
+	t.Helper()
+	b := &recorder{snapshot: mux.Snapshot{
+		Sessions: []mux.Session{{ID: "session:new/nix", Label: "new/nix"}},
+		Panes:    []mux.Pane{{Session: "session:new/nix", Label: "new/nix", ID: "pane", Tab: "tab:1", Focused: true}},
+	}}
+	p := taskTabs(b, kitty.Terminal{})
+	rows, err := p.Load(len(p.Tabs)-1, func([]popup.Row) {})
+	i := slices.IndexFunc(rows, func(r popup.Row) bool { return r.ID == id })
+	if err != nil || i < 0 {
+		t.Fatalf("loaded %v (%v), want a task at %s", rows, err, id)
+	}
+	enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
+	if msg := enter.Run(rows[i])(); msg != popup.Quit {
+		t.Errorf("%s: Enter gave %v, want the popup to close", id, msg)
+	}
+	file, line, _ := strings.Cut(id, ":")
+	edit := []string{"nvim", "+" + line, filepath.Join(vault, file)}
+	b.checkTaskOpen(t, id, vault, want, edit)
+}
+
+func (r *recorder) checkTaskOpen(t *testing.T, id, vault, want string, edit []string) {
+	t.Helper()
+	if want == vault {
+		if len(r.tabs) > 0 || len(r.made) != 1 || r.made[0].dir != want || r.lastPanes()[0].Run != layout.Line(edit) {
+			t.Errorf("%s: Enter ran %q and made %v, want a place for the vault running %q", id, r.tabs, r.made, edit)
+		}
+		return
+	}
+	if len(r.made) > 0 || len(r.tabs) != 1 || !slices.Equal(r.tabs[0], append([]string{"new/nix", want}, edit...)) {
+		t.Errorf("%s: Enter ran %q and made %v, want one tab of new/nix in %s running %q", id, r.tabs, r.made, want, edit)
+	}
+}
+
 // Enter on a task opens its note, at its line, in a new tab of its project's
 // place: the checkout whose origin repository has the project's name, and
 // the one git moved last when there are two. A task outside a project, or
 // one whose project has no checkout, opens in the vault's place, which ws
 // makes when there is none.
 func TestEnterOnATaskOpensItsProjectsPlace(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git")
+	clearGitHookEnv(t)
 	oldHome, oldInteractive := home, interactive
 	home, interactive = t.TempDir(), false
 	t.Cleanup(func() { home, interactive = oldHome, oldInteractive })
 	withConfig(t, "claude", "tab")
-	checkout := func(folder string, at time.Time) string {
-		dir := filepath.Join(home, folder, "nix")
-		log := filepath.Join(dir, ".git", "logs", "HEAD")
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		for _, args := range [][]string{{"init", "-q"}, {"remote", "add", "origin", "git@github.com:someone/nix.git"}} {
-			if _, err := git(dir, args...); err != nil {
-				t.Fatal(err)
-			}
-		}
-		writeNote(t, dir, ".git/logs/HEAD", "")
-		if err := os.Chtimes(log, at, at); err != nil {
-			t.Fatal(err)
-		}
-		return dir
-	}
-	checkout("old", now.Add(-time.Hour))
-	latest := checkout("new", now)
+	makeTaskCheckout(t, "old", now.Add(-time.Hour))
+	latest := makeTaskCheckout(t, "new", now)
 	vault := filepath.Join(home, "vault")
 	t.Setenv("VAULT_DIR", vault)
 	writeNote(t, vault, "notes/projects/nix/TODO.md", "# nix\n- [ ] pin the flake\n")
@@ -251,29 +276,7 @@ func TestEnterOnATaskOpensItsProjectsPlace(t *testing.T) {
 		"notes/projects/gone/TODO.md:1": vault,
 		"notes/daily/2026-11-09.md:1":   vault,
 	} {
-		b := &recorder{snapshot: mux.Snapshot{
-			Sessions: []mux.Session{{ID: "session:new/nix", Label: "new/nix"}},
-			Panes:    []mux.Pane{{Session: "session:new/nix", Label: "new/nix", ID: "pane", Tab: "tab:1", Focused: true}},
-		}}
-		p := taskTabs(b, kitty.Terminal{})
-		rows, err := p.Load(len(p.Tabs)-1, func([]popup.Row) {})
-		i := slices.IndexFunc(rows, func(r popup.Row) bool { return r.ID == id })
-		if err != nil || i < 0 {
-			t.Fatalf("loaded %v (%v), want a task at %s", rows, err, id)
-		}
-		enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
-		if msg := enter.Run(rows[i])(); msg != popup.Quit {
-			t.Errorf("%s: Enter gave %v, want the popup to close", id, msg)
-		}
-		file, line, _ := strings.Cut(id, ":")
-		edit := []string{"nvim", "+" + line, filepath.Join(vault, file)}
-		if want == vault {
-			if len(b.tabs) > 0 || len(b.made) != 1 || b.made[0].dir != vault || b.lastPanes()[0].Run != layout.Line(edit) {
-				t.Errorf("%s: Enter ran %q and made %v, want a place for the vault running %q", id, b.tabs, b.made, edit)
-			}
-		} else if len(b.made) > 0 || len(b.tabs) != 1 || !slices.Equal(b.tabs[0], append([]string{"new/nix", want}, edit...)) {
-			t.Errorf("%s: Enter ran %q and made %v, want one tab of new/nix in %s running %q", id, b.tabs, b.made, want, edit)
-		}
+		checkTaskEnterOpens(t, vault, id, want)
 	}
 }
 

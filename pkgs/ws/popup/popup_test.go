@@ -8,14 +8,13 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"workspace/popup"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
-
-	"workspace/popup"
 )
 
 var (
@@ -218,7 +217,7 @@ func TestRowsShownWhileLoadingGiveWayToTheFinalOnes(t *testing.T) {
 	}
 	// The rows arrive while the program runs, as they do in a terminal.
 	prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(io.Discard), tea.WithoutRenderer(), tea.WithoutSignalHandler())
-	go prog.Run()
+	go func() { _, _ = prog.Run() }()
 	t.Cleanup(prog.Kill)
 	prog.Send(size)
 	prog.Send(enter)
@@ -265,7 +264,7 @@ func TestTheCursorStaysOnTheTopRowUntilYouMoveIt(t *testing.T) {
 		}
 		s := new(terminal)
 		prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(s), tea.WithoutSignalHandler())
-		go prog.Run()
+		go func() { _, _ = prog.Run() }()
 		prog.Send(size)
 		s.waitToDraw(t, "bravo")
 		for _, k := range tc.keys {
@@ -297,7 +296,7 @@ func TestAnEarlyEnterWaitsForARowThatMatches(t *testing.T) {
 		Actions: []popup.Action{{Key: "enter", Help: "pick", Run: func(r popup.Row) tea.Cmd { picks <- r; return nil }}},
 	}
 	prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(io.Discard), tea.WithoutRenderer(), tea.WithoutSignalHandler())
-	go prog.Run()
+	go func() { _, _ = prog.Run() }()
 	t.Cleanup(prog.Kill)
 	prog.Send(size)
 	prog.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("login")})
@@ -354,7 +353,7 @@ func TestAPopupWaitsForTheTerminalsRealSize(t *testing.T) {
 	start := func() (*terminal, *tea.Program) {
 		s := new(terminal)
 		prog := tea.NewProgram(popup.WaitForSize(popup.New(p, nil), placeholder), tea.WithInput(nil), tea.WithOutput(s), tea.WithoutSignalHandler())
-		go prog.Run()
+		go func() { _, _ = prog.Run() }()
 		t.Cleanup(prog.Kill)
 		prog.Send(placeholder)
 		return s, prog
@@ -376,7 +375,7 @@ func TestAPopupWaitsForTheTerminalsRealSize(t *testing.T) {
 func open(t *testing.T, p popup.Popup) *terminal {
 	s := new(terminal)
 	prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(s), tea.WithoutSignalHandler())
-	go prog.Run()
+	go func() { _, _ = prog.Run() }()
 	t.Cleanup(prog.Kill)
 	prog.Send(size)
 	return s
@@ -580,9 +579,11 @@ func TestAnActionRunsOnlyWhereItWorks(t *testing.T) {
 	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) {
 		return []popup.Row{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}}, nil
 	}
-	p.Actions = []popup.Action{{Key: "ctrl+x", Help: "done",
+	p.Actions = []popup.Action{{
+		Key: "ctrl+x", Help: "done",
 		When: func(tab int, r popup.Row) bool { return tab == 0 && r.ID == "b" },
-		Run:  func(r popup.Row) tea.Cmd { done = append(done, r.ID); return nil }}}
+		Run:  func(r popup.Row) tea.Cmd { done = append(done, r.ID); return nil },
+	}}
 	ctrlX := tea.KeyMsg{Type: tea.KeyCtrlX}
 	// Ctrl-X on each row of Needs you, then on each row of Issues.
 	run(start(p), ctrlX, down, ctrlX, tea.KeyMsg{Type: tea.KeyTab}, ctrlX, down, ctrlX)

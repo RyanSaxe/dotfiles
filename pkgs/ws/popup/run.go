@@ -100,47 +100,15 @@ func (s stack) View() string { return s.top().view() }
 func (s stack) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		s.size, s.frames = msg, slices.Clone(s.frames)
-		for i := range s.frames {
-			s.frames[i], _ = s.frames[i].update(msg)
-		}
-		return s, nil
+		return s.resizeAll(msg), nil
 	case pushMsg:
-		f, _ := newFrame(s.next, true, Popup(msg), s.art).update(s.size)
-		s.next++
-		s.frames = append(slices.Clone(s.frames), f)
-		return s, f.load()
+		return s.pushFrame(Popup(msg))
 	case closeMsg:
-		if len(s.frames) == 1 {
-			return s, tea.Quit
-		}
-		s.frames = slices.Clone(s.frames[:len(s.frames)-1])
-		if s.top().busy() {
-			return s, s.top().spin.Tick
-		}
-		return s, nil
+		return s.closeTop()
 	case reloadMsg:
-		m, cmd := s.updateFrame(s.top().id, msg)
-		if s.draw == nil {
-			return m, cmd
-		}
-		draw := s.draw
-		return m, tea.Batch(cmd, func() tea.Msg { return artMsg(draw()) })
+		return s.reloadTop(msg)
 	case artMsg:
-		// Every frame shows the art in its header, and the header's height
-		// sets the room left for the list. A new mascot brings a new accent.
-		s.art, s.frames = Art(msg), slices.Clone(s.frames)
-		if s.art.Accent != "" {
-			Accent = lipgloss.NewStyle().Foreground(lipgloss.Color(s.art.Accent))
-		}
-		for i := range s.frames {
-			s.frames[i].art = s.art
-			s.frames[i].restyle()
-			if s.size.Width > 0 {
-				s.frames[i], _ = s.frames[i].update(s.size)
-			}
-		}
-		return s, nil
+		return s.applyArt(Art(msg)), nil
 	case rowsMsg:
 		return s.updateFrame(msg.frame, msg)
 	case detailMsg:
@@ -149,6 +117,58 @@ func (s stack) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s.updateFrame(msg.frame, msg)
 	}
 	return s.updateFrame(s.top().id, msg)
+}
+
+func (s stack) resizeAll(msg tea.WindowSizeMsg) stack {
+	s.size, s.frames = msg, slices.Clone(s.frames)
+	for i := range s.frames {
+		s.frames[i], _ = s.frames[i].update(msg)
+	}
+	return s
+}
+
+func (s stack) pushFrame(p Popup) (stack, tea.Cmd) {
+	f, _ := newFrame(s.next, true, p, s.art).update(s.size)
+	s.next++
+	s.frames = append(slices.Clone(s.frames), f)
+	return s, f.load()
+}
+
+func (s stack) closeTop() (stack, tea.Cmd) {
+	if len(s.frames) == 1 {
+		return s, tea.Quit
+	}
+	s.frames = slices.Clone(s.frames[:len(s.frames)-1])
+	if s.top().busy() {
+		return s, s.top().spin.Tick
+	}
+	return s, nil
+}
+
+func (s stack) reloadTop(msg reloadMsg) (tea.Model, tea.Cmd) {
+	m, cmd := s.updateFrame(s.top().id, msg)
+	if s.draw == nil {
+		return m, cmd
+	}
+	draw := s.draw
+	return m, tea.Batch(cmd, func() tea.Msg { return artMsg(draw()) })
+}
+
+func (s stack) applyArt(art Art) stack {
+	// Every frame shows the art in its header, and the header's height
+	// sets the room left for the list. A new mascot brings a new accent.
+	s.art, s.frames = art, slices.Clone(s.frames)
+	if s.art.Accent != "" {
+		Accent = lipgloss.NewStyle().Foreground(lipgloss.Color(s.art.Accent))
+	}
+	for i := range s.frames {
+		s.frames[i].art = s.art
+		s.frames[i].restyle()
+		if s.size.Width > 0 {
+			s.frames[i], _ = s.frames[i].update(s.size)
+		}
+	}
+	return s
 }
 
 // updateFrame hands msg to the frame with the id, which may be under the

@@ -110,49 +110,59 @@ func (m frame) load() tea.Cmd {
 		}
 	}
 	for _, t := range order {
-		id, gen := m.id, m.tabs[t].gen
-		// The box holds the newest rows the frame hasn't read. They replace
-		// any older ones, so Load never waits on the frame, even one that has
-		// stopped reading after a reload or closed.
-		box, mu := make(chan rowsMsg, 1), new(sync.Mutex)
-		// A panic in Load is raised again where the frame reads, in a command,
-		// where Bubble Tea catches it and restores the terminal.
-		read := func() tea.Msg {
-			msg := <-box
-			if msg.panicked != nil {
-				panic(msg.panicked)
-			}
-			return msg
-		}
-		put := func(msg rowsMsg) {
-			mu.Lock()
-			defer mu.Unlock()
-			select {
-			case <-box:
-			default:
-			}
-			box <- msg
-		}
-		cmds = append(cmds, func() tea.Msg {
-			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						put(rowsMsg{panicked: fmt.Sprintf("%v\n\n%s", r, debug.Stack())})
-					}
-				}()
-				if t == m.active {
-					defer close(activeDone)
-				} else {
-					<-activeDone
-				}
-				show := func(rows []Row) { put(rowsMsg{frame: id, tab: t, gen: gen, rows: rows, more: read}) }
-				rows, err := m.p.Load(t, show)
-				put(rowsMsg{frame: id, tab: t, gen: gen, rows: rows, err: err})
-			}()
-			return read()
-		})
+		cmds = append(cmds, m.loadTab(t, activeDone))
 	}
 	return tea.Batch(cmds...)
+}
+
+type tabTarget struct{ frame, tab, gen int }
+
+func (m frame) loadTab(t int, activeDone chan struct{}) tea.Cmd {
+	target := tabTarget{frame: m.id, tab: t, gen: m.tabs[t].gen}
+	// The box holds the newest rows the frame hasn't read. They replace
+	// any older ones, so Load never waits on the frame, even one that has
+	// stopped reading after a reload or closed.
+	box, mu := make(chan rowsMsg, 1), new(sync.Mutex)
+	// A panic in Load is raised again where the frame reads, in a command,
+	// where Bubble Tea catches it and restores the terminal.
+	read := func() tea.Msg {
+		msg := <-box
+		if msg.panicked != nil {
+			panic(msg.panicked)
+		}
+		return msg
+	}
+	put := func(msg rowsMsg) {
+		mu.Lock()
+		defer mu.Unlock()
+		select {
+		case <-box:
+		default:
+		}
+		box <- msg
+	}
+	return func() tea.Msg {
+		go m.runTabLoad(target, activeDone, read, put)
+		return read()
+	}
+}
+
+func (m frame) runTabLoad(target tabTarget, activeDone chan struct{}, read func() tea.Msg, put func(rowsMsg)) {
+	defer func() {
+		if r := recover(); r != nil {
+			put(rowsMsg{panicked: fmt.Sprintf("%v\n\n%s", r, debug.Stack())})
+		}
+	}()
+	if target.tab == m.active {
+		defer close(activeDone)
+	} else {
+		<-activeDone
+	}
+	show := func(rows []Row) {
+		put(rowsMsg{frame: target.frame, tab: target.tab, gen: target.gen, rows: rows, more: read})
+	}
+	rows, err := m.p.Load(target.tab, show)
+	put(rowsMsg{frame: target.frame, tab: target.tab, gen: target.gen, rows: rows, err: err})
 }
 
 func (m frame) busy() bool {
@@ -186,50 +196,80 @@ func (m frame) works(a Action) bool {
 func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.w, m.h = max(msg.Width, 40), max(msg.Height, 12) // narrower would break the layout math
-		for i := range m.lists {
-			m.lists[i].SetSize(m.leftW()-4, m.h-m.headerH()-4-m.footerH())
-		}
-		m.syncDetail()
-		return m, nil
+		return m.resize(msg), nil
 	case rowsMsg:
-		event := tabEvent(tabDone{msg.gen, msg.err})
-		if msg.more != nil {
-			event = tabShown{msg.gen}
+		return m.handleRows(msg)
+	case settleMsg, detailMsg:
+		return m.handleDetailMsg(msg)
+	case askMsg, noticeMsg, reloadMsg:
+		return m.handleFooterMsg(msg)
+	case quitMsg:
+		return m, tea.Quit
+	case spinner.TickMsg:
+		return m.handleTick(msg)
+	case tea.KeyMsg:
+		return m.handleKey(msg)
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+	}
+	return m.updateList(msg)
+}
+
+func (m frame) resize(msg tea.WindowSizeMsg) frame {
+	m.w, m.h = max(msg.Width, 40), max(msg.Height, 12) // narrower would break the layout math
+	for i := range m.lists {
+		m.lists[i].SetSize(m.leftW()-4, m.h-m.headerH()-4-m.footerH())
+	}
+	m.syncDetail()
+	return m
+}
+
+func (m frame) handleRows(msg rowsMsg) (frame, tea.Cmd) {
+	event := tabEvent(tabDone{msg.gen, msg.err})
+	if msg.more != nil {
+		event = tabShown{msg.gen}
+	}
+	var effect rowsEffect
+	switch m.tabs[msg.tab], effect = m.tabs[msg.tab].next(event); effect {
+	case dropRows:
+		return m, nil
+	case holdRows:
+		return m, msg.more
+	}
+	m.setRows(msg.tab, msg.rows)
+	cmds := []tea.Cmd{msg.more}
+	if msg.tab == m.active {
+		// The row's details wait from when its rows arrive, unless the
+		// frame already says it's loading them.
+		at := time.Now()
+		if slow(m.started) {
+			at = m.started
 		}
-		var effect rowsEffect
-		switch m.tabs[msg.tab], effect = m.tabs[msg.tab].next(event); effect {
-		case dropRows:
-			return m, nil
-		case holdRows:
-			return m, msg.more
-		}
-		m.setRows(msg.tab, msg.rows)
-		cmds := []tea.Cmd{msg.more}
-		if msg.tab == m.active {
-			// The row's details wait from when its rows arrive, unless the
-			// frame already says it's loading them.
-			at := time.Now()
-			if slow(m.started) {
-				at = m.started
-			}
-			cmds = append(cmds, m.moveSelected(rowsLoaded{m.reloads, at}))
-		}
-		if effect == showAndPick {
-			var picked tea.Cmd
-			m, picked = m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
-			cmds = append(cmds, picked)
-		}
-		return m, tea.Batch(cmds...)
+		cmds = append(cmds, m.moveSelected(rowsLoaded{m.reloads, at}))
+	}
+	if effect == showAndPick {
+		var picked tea.Cmd
+		m, picked = m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+		cmds = append(cmds, picked)
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m frame) handleDetailMsg(msg tea.Msg) (frame, tea.Cmd) {
+	switch msg := msg.(type) {
 	case settleMsg:
 		if r, ok := m.selected(); ok && r.ID == msg.id {
 			return m, m.moveDetail(r, rested{})
 		}
-		return m, nil
 	case detailMsg:
 		m.details[msg.id], _ = m.details[msg.id].next(fetched{msg.gen, msg.data, msg.err})
 		m.syncDetail()
-		return m, nil
+	}
+	return m, nil
+}
+
+func (m frame) handleFooterMsg(msg tea.Msg) (frame, tea.Cmd) {
+	switch msg := msg.(type) {
 	case askMsg:
 		m.foot, _ = m.foot.next(ask{msg})
 		m.input.Reset()
@@ -248,21 +288,17 @@ func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 		}
 		m.syncDetail()
 		return m, m.load()
-	case quitMsg:
-		return m, tea.Quit
-	case spinner.TickMsg:
-		if !m.busy() {
-			return m, nil // let the tick chain stop while idle
-		}
-		var cmd tea.Cmd
-		m.spin, cmd = m.spin.Update(msg)
-		return m, cmd
-	case tea.KeyMsg:
-		return m.handleKey(msg)
-	case tea.MouseMsg:
-		return m.handleMouse(msg)
 	}
-	return m.updateList(msg)
+	return m, nil
+}
+
+func (m frame) handleTick(msg spinner.TickMsg) (frame, tea.Cmd) {
+	if !m.busy() {
+		return m, nil // let the tick chain stop while idle
+	}
+	var cmd tea.Cmd
+	m.spin, cmd = m.spin.Update(msg)
+	return m, cmd
 }
 
 // moveDetail moves the row's details on, and starts what that calls for. A
@@ -289,79 +325,122 @@ func (m *frame) moveDetail(r Row, e detailEvent) tea.Cmd {
 
 func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 	if m.foot.state == asking {
-		switch k.String() {
-		case "esc", "ctrl+c":
-			m.foot, _ = m.foot.next(dismiss{})
-			return m, nil
-		case "enter":
-			var q *askMsg
-			m.foot, q = m.foot.next(answer{})
-			return m, q.answered(strings.TrimSpace(m.input.Value()))
-		}
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(k)
-		return m, cmd
+		return m.handleAskKey(k)
 	}
 	m.foot, _ = m.foot.next(keyPressed{})
 	m.tabs[m.active], _ = m.tabs[m.active].next(keyPressed{})
-	l, key, detailsAlone := &m.lists[m.active], k.String(), m.narrow() && m.phone == phoneDetails
-	switch {
-	case key == "ctrl+c":
-		return m, tea.Quit
-	case key == "esc" && !detailsAlone && l.FilterValue() == "":
-		return m, func() tea.Msg { return closeMsg{} }
-	case detailsAlone && (key == "esc" || key == "left"):
-		m.phone = m.phone.next(closeDetails{})
-		return m, nil
-	case key == "esc":
-		return m, m.filter("")
-	case m.narrow() && key == "right":
-		m.phone = m.phone.next(openDetails{})
-		return m, nil
+	key := k.String()
+	if next, cmd, ok := m.handleEscapeOrPhoneKey(key); ok {
+		return next, cmd
 	}
+	if cmd, ok := m.runActionKey(key); ok {
+		return m, cmd
+	}
+	if next, cmd, ok := m.handleNavKey(key); ok {
+		return next, cmd
+	}
+	return m.handleFilterKey(k, key)
+}
+
+func (m frame) handleAskKey(k tea.KeyMsg) (frame, tea.Cmd) {
+	switch k.String() {
+	case "esc", "ctrl+c":
+		m.foot, _ = m.foot.next(dismiss{})
+		return m, nil
+	case "enter":
+		var q *askMsg
+		m.foot, q = m.foot.next(answer{})
+		return m, q.answered(strings.TrimSpace(m.input.Value()))
+	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(k)
+	return m, cmd
+}
+
+func (m frame) handleEscapeOrPhoneKey(key string) (frame, tea.Cmd, bool) {
+	if key == "ctrl+c" {
+		return m, tea.Quit, true
+	}
+	if next, ok := m.handlePhoneKey(key); ok {
+		return next, nil, true
+	}
+	if key != "esc" {
+		return m, nil, false
+	}
+	if m.lists[m.active].FilterValue() == "" {
+		return m, func() tea.Msg { return closeMsg{} }, true
+	}
+	return m, m.filter(""), true
+}
+
+func (m frame) handlePhoneKey(key string) (frame, bool) {
+	if !m.narrow() {
+		return m, false
+	}
+	if m.phone == phoneDetails && (key == "esc" || key == "left") {
+		m.phone = m.phone.next(closeDetails{})
+		return m, true
+	}
+	if key == "right" {
+		m.phone = m.phone.next(openDetails{})
+		return m, true
+	}
+	return m, false
+}
+
+// runActionKey runs a popup's own key, or records an early Enter while rows
+// are still loading so typing a name and Enter goes to its top match.
+func (m *frame) runActionKey(key string) (tea.Cmd, bool) {
 	// A popup's own key comes first, so it can take over one of the frame's,
 	// as the Inbox does with Ctrl-R.
 	r, ok := m.selected()
 	for _, a := range m.p.Actions {
 		if a.Key == key && m.works(a) {
-			return m, a.Run(r)
+			return a.Run(r), true
 		}
 	}
-	// Enter with no row to pick, while the rows are still loading, waits for
-	// one that matches, so typing a name and Enter straight after the popup
-	// opens goes to its top match.
 	if key == "enter" && !ok {
 		m.tabs[m.active], _ = m.tabs[m.active].next(pickEarly{})
-		return m, nil
+		return nil, true
 	}
+	return nil, false
+}
+
+func (m frame) handleNavKey(key string) (frame, tea.Cmd, bool) {
+	l := &m.lists[m.active]
 	switch key {
 	case "up", "ctrl+k", "ctrl+p":
 		l.CursorUp()
 		m.cursors[m.active] = m.cursors[m.active].next(movedCursor{})
-		return m, m.selectionChanged()
+		return m, m.selectionChanged(), true
 	case "down", "ctrl+j", "ctrl+n":
 		l.CursorDown()
 		m.cursors[m.active] = m.cursors[m.active].next(movedCursor{})
-		return m, m.selectionChanged()
+		return m, m.selectionChanged(), true
 	case "tab":
 		m.active = (m.active + 1) % len(m.lists)
-		return m, m.selectionChanged()
+		return m, m.selectionChanged(), true
 	case "shift+tab":
 		m.active = (m.active + len(m.lists) - 1) % len(m.lists)
-		return m, m.selectionChanged()
+		return m, m.selectionChanged(), true
 	case "ctrl+r":
-		return m, func() tea.Msg { return reloadMsg("") } // through the stack, which draws the art again
+		return m, func() tea.Msg { return reloadMsg("") }, true // through the stack, which draws the art again
 	case "ctrl+d":
 		m.vp.HalfPageDown()
-		return m, nil
+		return m, nil, true
 	case "ctrl+u":
 		m.vp.HalfPageUp()
-		return m, nil
+		return m, nil, true
 	}
+	return m, nil, false
+}
+
+func (m frame) handleFilterKey(k tea.KeyMsg, key string) (frame, tea.Cmd) {
 	// Every other key that types or deletes text edits the filter, as in fzf.
 	if k.Alt || k.Type != tea.KeyRunes && k.Type != tea.KeySpace && k.Type != tea.KeyBackspace && key != "ctrl+w" {
 		return m, nil
 	}
+	l := &m.lists[m.active]
 	l.FilterInput, _ = l.FilterInput.Update(k)
 	return m, m.filter(l.FilterInput.Value())
 }
@@ -581,23 +660,36 @@ func (m frame) detailHead(r Row, ok bool, w int, loading bool) string {
 	if lines == nil && m.narrow() {
 		lines = []string{ansi.Truncate(Dim.Render(r.Detail), w, "…"), Bold.Width(w).Render(r.Title), ""}
 	}
-	switch d := m.details[r.ID]; {
-	case m.p.Fetch == nil:
-	case (d.state == unasked || d.state == waiting || d.state == fetching) && loading:
-		lines = append(lines, m.spin.View()+Dim.Render(" loading details"))
-	case d.state == missing:
-		lines = append(lines, Red.Width(w).Render(d.err.Error()))
+	if status := m.detailStatusLine(r, w, loading); status != "" {
+		lines = append(lines, status)
 	}
 	// The rule divides a header from the body, so without one there's none.
 	if len(lines) == 0 {
 		return ""
 	}
-	rule := strings.Repeat("─", w)
+	return strings.Join(append(lines, Dim.Render(m.detailRule(w))), "\n")
+}
+
+func (m frame) detailStatusLine(r Row, w int, loading bool) string {
+	if m.p.Fetch == nil {
+		return ""
+	}
+	d := m.details[r.ID]
+	if d.state == missing {
+		return Red.Width(w).Render(d.err.Error())
+	}
+	if loading && (d.state == unasked || d.state == waiting || d.state == fetching) {
+		return m.spin.View() + Dim.Render(" loading details")
+	}
+	return ""
+}
+
+func (m frame) detailRule(w int) string {
 	if m.vp.Height > 0 && m.vp.TotalLineCount() > m.vp.Height {
 		pct := fmt.Sprintf(" %d%%", int(m.vp.ScrollPercent()*100))
-		rule = strings.Repeat("─", w-len(pct)) + pct
+		return strings.Repeat("─", w-len(pct)) + pct
 	}
-	return strings.Join(append(lines, Dim.Render(rule)), "\n")
+	return strings.Repeat("─", w)
 }
 
 // delegate draws every row of a popup the same height: two full lines, or
@@ -633,7 +725,7 @@ func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	line1 := bar + lipgloss.StyleRunes(t, matches, title.Underline(true), title) +
 		strings.Repeat(" ", tw-ansi.StringWidth(t)+1) + tag
 	if d.oneLine {
-		fmt.Fprint(w, line1)
+		_, _ = fmt.Fprint(w, line1)
 		return
 	}
 	qualifier := Dim.Render(r.Qualifier)
@@ -641,33 +733,37 @@ func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	detail := ansi.Truncate(r.Detail, dw, "…")
 	line2 := bar + Dim.Render(detail) +
 		strings.Repeat(" ", dw-ansi.StringWidth(detail)+1) + qualifier
-	fmt.Fprint(w, line1+"\n"+line2)
+	_, _ = fmt.Fprint(w, line1+"\n"+line2)
 }
 
 func (m frame) view() string {
 	if m.w == 0 {
 		return "" // the first frame comes before the terminal size
 	}
-	// A tab's count has the spinner beside it while its load runs, since its
-	// rows may still grow or change.
-	count := func(i int) string {
-		if !m.tabs[i].showsRows() {
-			return ""
-		}
-		n := strconv.Itoa(len(m.lists[i].Items()))
-		if m.tabs[i].busy() {
-			return Dim.Render(" ("+n+" ") + m.spin.View() + Dim.Render(")")
-		}
-		return Dim.Render(" (" + n + ")")
+	// The image rides on the boxes' top border, a line that changes only with
+	// the size, so the terminal gets it again only after a resize repaints.
+	return m.renderHeader() + "\n" + m.art.Setup + m.renderBody() + "\n" + m.renderFooter()
+}
+
+func (m frame) tabCount(i int) string {
+	if !m.tabs[i].showsRows() {
+		return ""
 	}
-	// The header is the tabs with their counts, and the art at the right.
+	n := strconv.Itoa(len(m.lists[i].Items()))
+	if m.tabs[i].busy() {
+		return Dim.Render(" ("+n+" ") + m.spin.View() + Dim.Render(")")
+	}
+	return Dim.Render(" (" + n + ")")
+}
+
+func (m frame) renderHeader() string {
 	tabs := make([]string, len(m.p.Tabs))
 	for i, t := range m.p.Tabs {
 		style := Dim
 		if i == m.active {
 			style = Accent.Bold(true)
 		}
-		tabs[i] = style.Render(t.Name) + count(i)
+		tabs[i] = style.Render(t.Name) + m.tabCount(i)
 	}
 	// On a narrow screen the tabs before the active one give way to it, so
 	// it stays in view.
@@ -686,6 +782,10 @@ func (m frame) view() string {
 	if m.art.Rows > 0 {
 		header = lipgloss.JoinHorizontal(lipgloss.Center, lipgloss.NewStyle().Width(m.w-m.art.Cols-1).Render(header), m.art.Cells)
 	}
+	return header
+}
+
+func (m frame) renderBody() string {
 	lw, bodyH := m.leftW(), m.h-m.headerH()-m.footerH()
 	left := box.Width(lw - 2).Height(bodyH - 2).Render(m.listPane(lw-4, bodyH-2))
 	r, ok := m.selected()
@@ -694,15 +794,13 @@ func (m frame) view() string {
 		details = head + "\n" + details
 	}
 	right := box.Width(m.rightW() + 2).Height(bodyH - 2).Render(details)
-	body := lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 	if m.narrow() && m.phone == phoneDetails {
-		body = right
-	} else if !m.sideBySide() {
-		body = left
+		return right
 	}
-	// The image rides on the boxes' top border, a line that changes only with
-	// the size, so the terminal gets it again only after a resize repaints.
-	return header + "\n" + m.art.Setup + body + "\n" + m.renderFooter()
+	if !m.sideBySide() {
+		return left
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 }
 
 func (m frame) listPane(w, h int) string {
@@ -726,6 +824,11 @@ func (m frame) listPane(w, h int) string {
 	case len(l.Items()) == 0:
 		return center(Green.Render("✓"), "", Dim.Render(m.p.Tabs[m.active].Empty))
 	}
+	return m.listFilterLine(w) + "\n\n" + l.View()
+}
+
+func (m frame) listFilterLine(w int) string {
+	l, t := m.lists[m.active], m.tabs[m.active]
 	filter, count := Dim.Render("/ type to filter"), ""
 	if query := l.FilterValue(); query != "" {
 		filter = Accent.Render("/ ") + query
@@ -735,7 +838,7 @@ func (m frame) listPane(w, h int) string {
 		}
 	}
 	gap := strings.Repeat(" ", max(0, w-lipgloss.Width(filter)-lipgloss.Width(count)))
-	return ansi.Truncate(filter+gap+count, w, "…") + "\n\n" + l.View()
+	return ansi.Truncate(filter+gap+count, w, "…")
 }
 
 func (m frame) renderFooter() string {
@@ -745,13 +848,25 @@ func (m frame) renderFooter() string {
 	case notice:
 		return ansi.Truncate(" "+Accent.Render("›")+" "+m.foot.text, m.w, "…")
 	}
-	esc := "quit"
-	if m.over {
-		esc = "back"
+	var parts []string
+	for _, k := range m.footerKeys() {
+		parts = append(parts, Dim.Bold(true).Render(k[0])+" "+Dim.Render(k[1]))
 	}
+	return m.wrapFooter(parts)
+}
+
+func (m frame) escHelp() string {
 	if m.lists[m.active].FilterValue() != "" {
-		esc = "clear"
+		return "clear"
 	}
+	if m.over {
+		return "back"
+	}
+	return "quit"
+}
+
+func (m frame) footerKeys() [][2]string {
+	esc := m.escHelp()
 	detailsAlone := m.narrow() && m.phone == phoneDetails
 	keys := [][2]string{{"↑↓", "move"}, {"tab", "switch"}}
 	if detailsAlone {
@@ -762,24 +877,31 @@ func (m frame) renderFooter() string {
 	if len(m.lists) == 1 {
 		keys = slices.DeleteFunc(keys, func(k [2]string) bool { return k[0] == "tab" })
 	}
+	keys = m.appendActionKeys(keys, detailsAlone)
+	if esc != "" {
+		keys = append(keys, [2]string{"esc", esc})
+	}
+	return keys
+}
+
+func (m frame) appendActionKeys(keys [][2]string, detailsAlone bool) [][2]string {
+	hasRefresh := false
 	for _, a := range m.p.Actions {
 		if m.works(a) {
 			keys = append(keys, [2]string{strings.ReplaceAll(a.Key, "ctrl+", "^"), a.Help})
+			hasRefresh = hasRefresh || a.Key == "ctrl+r"
 		}
 	}
-	if !slices.ContainsFunc(m.p.Actions, func(a Action) bool { return a.Key == "ctrl+r" && m.works(a) }) {
+	if !hasRefresh {
 		keys = append(keys, [2]string{"^r", "refresh"})
 	}
 	if m.sideBySide() || detailsAlone {
 		keys = append(keys, [2]string{"^d/^u", "scroll"})
 	}
-	if esc != "" {
-		keys = append(keys, [2]string{"esc", esc})
-	}
-	var parts []string
-	for _, k := range keys {
-		parts = append(parts, Dim.Bold(true).Render(k[0])+" "+Dim.Render(k[1]))
-	}
+	return keys
+}
+
+func (m frame) wrapFooter(parts []string) string {
 	sep := Dim.Render(" · ")
 	if !m.narrow() {
 		return ansi.Truncate(" "+strings.Join(parts, sep), m.w, "…")

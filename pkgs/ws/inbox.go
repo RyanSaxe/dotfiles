@@ -71,7 +71,7 @@ func (it item) activity() string {
 type standing int
 
 const (
-	clear        standing = iota // nothing needs you
+	settled      standing = iota // nothing needs you
 	needsYou                     // a reason you haven't acknowledged
 	acknowledged                 // nothing new since you acknowledged it
 )
@@ -82,7 +82,7 @@ type acks map[string]string
 func (a acks) standing(it item) standing {
 	switch {
 	case len(it.Reasons) == 0:
-		return clear
+		return settled
 	case a[it.ID] == it.activity():
 		return acknowledged
 	}
@@ -123,7 +123,7 @@ func (a acks) apply(e ackEvent) acks {
 var stateDir = filepath.Join(cmp.Or(os.Getenv("XDG_STATE_HOME"), filepath.Join(home, ".local", "state")), "ws")
 
 func readJSON(name string, v any) error {
-	data, err := os.ReadFile(filepath.Join(stateDir, name))
+	data, err := os.ReadFile(filepath.Join(stateDir, name)) //nolint:gosec // reads ws state JSON file from stateDir
 	if err == nil {
 		err = json.Unmarshal(data, v)
 	}
@@ -140,7 +140,7 @@ func writeJSON(name string, v any) error {
 }
 
 func writeWhole(name string, data []byte) error {
-	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+	if err := os.MkdirAll(stateDir, 0o750); err != nil {
 		return err
 	}
 	return replaceFile(filepath.Join(stateDir, name), data)
@@ -155,17 +155,17 @@ func replaceFile(file string, data []byte) error {
 		return err
 	}
 	_, err = tmp.Write(data)
-	if info, statErr := os.Stat(file); err == nil && statErr == nil {
+	if info, statErr := os.Stat(file); err == nil && statErr == nil { //nolint:gosec // preserves permissions on local state/config file being atomically replaced
 		err = tmp.Chmod(info.Mode().Perm())
 	}
 	if closeErr := tmp.Close(); err == nil {
 		err = closeErr
 	}
 	if err == nil {
-		err = os.Rename(tmp.Name(), file)
+		err = os.Rename(tmp.Name(), file) //nolint:gosec // atomic swap of caller-supplied local state/config file
 	}
 	if err != nil {
-		os.Remove(tmp.Name())
+		_ = os.Remove(tmp.Name()) //nolint:gosec // cleanup of temp file created above
 	}
 	return err
 }
@@ -259,56 +259,122 @@ func (n *ghNode) dropActivityOf(ignored func(login string) bool) {
 
 var mention = regexp.MustCompile(`@([A-Za-z0-9-]+)`)
 
+func isMine(a *ghActor, me string) bool { return a != nil && strings.EqualFold(a.Login, me) }
+
+func allComments(n ghNode) []ghComment {
+	comments := slices.Clone(n.Comments.Nodes)
+	for _, t := range n.ReviewThreads.Nodes {
+		comments = append(comments, t.Comments.Nodes...)
+	}
+	return comments
+}
+
+func mentionsUser(body, me string) bool {
+	return slices.ContainsFunc(mention.FindAllStringSubmatch(body, -1), func(m []string) bool {
+		return strings.EqualFold(m[1], me)
+	})
+}
+
+func viewerReacted(c ghComment) bool {
+	return slices.ContainsFunc(c.ReactionGroups, func(g struct{ ViewerHasReacted bool }) bool {
+		return g.ViewerHasReacted
+	})
+}
+
+func newerComment(cur, cand *ghComment) *ghComment {
+	if cur == nil || cand.CreatedAt.After(cur.CreatedAt) {
+		return cand
+	}
+	return cur
+}
+
+func scanComments(comments []ghComment, me string) (tookPart bool, theirs, answered *ghComment) {
+	for i := range comments {
+		c := &comments[i]
+		mine := isMine(c.Author, me)
+		if mine || c.Author.person() && mentionsUser(c.Body, me) {
+			tookPart = true
+		}
+		if mine || viewerReacted(*c) {
+			answered = newerComment(answered, c)
+		}
+		if c.Author.person() && !mine {
+			theirs = newerComment(theirs, c)
+		}
+	}
+	return tookPart, theirs, answered
+}
+
+func failingReason(n ghNode) (reason, bool) {
+	cs := n.Commits.Nodes
+	if len(cs) == 0 || cs[0].Commit.StatusCheckRollup == nil {
+		return reason{}, false
+	}
+	s := cs[0].Commit.StatusCheckRollup.State
+	if s != "FAILURE" && s != "ERROR" {
+		return reason{}, false
+	}
+	return reason{Kind: failing, Actor: failedChecks(cs[0].Commit), At: n.UpdatedAt, Key: cs[0].Commit.Oid}, true
+}
+
+func latestReviewReason(n ghNode, me string) (reason, bool) {
+	var last *ghReview
+	for i := range n.Reviews.Nodes {
+		r := &n.Reviews.Nodes[i]
+		if r.State == "DISMISSED" || !r.Author.person() || isMine(r.Author, me) {
+			continue
+		}
+		if last == nil || r.SubmittedAt.After(last.SubmittedAt) {
+			last = r
+		}
+	}
+	if last == nil {
+		return reason{}, false
+	}
+	kind := reviewed
+	if last.State == "CHANGES_REQUESTED" {
+		kind = changesRequested
+	}
+	return reason{Kind: kind, Actor: last.Author.Login, At: last.SubmittedAt, Key: last.ID, Text: last.Body}, true
+}
+
+func commentReason(involved bool, theirs, answered *ghComment) (reason, bool) {
+	if !involved || theirs == nil {
+		return reason{}, false
+	}
+	if answered != nil && !theirs.CreatedAt.After(answered.CreatedAt) {
+		return reason{}, false
+	}
+	return reason{Kind: commented, Actor: theirs.Author.Login, At: theirs.CreatedAt, Key: theirs.ID, Text: theirs.Body}, true
+}
+
+func openedReason(n ghNode, yours, watched bool, now time.Time) (reason, bool) {
+	if !watched || yours || n.IsDraft || !n.Author.person() || now.Sub(n.CreatedAt) >= 7*24*time.Hour {
+		return reason{}, false
+	}
+	return reason{Kind: opened, Actor: n.Author.Login, At: n.CreatedAt, Key: n.ID}, true
+}
+
 // reasonsFor applies the rail's four rules to one item. me is your GitHub
 // login, and watched says whether the item's repository is on your watch
 // list.
 func reasonsFor(n ghNode, me string, watched bool, now time.Time) []reason {
-	mine := func(a *ghActor) bool { return a != nil && strings.EqualFold(a.Login, me) }
-	comments := n.Comments.Nodes
-	for _, t := range n.ReviewThreads.Nodes {
-		comments = append(comments, t.Comments.Nodes...)
-	}
-	yours, tookPart := mine(n.Author), false
-	var theirs, answered *ghComment
-	for i, c := range comments {
-		mentioned := slices.ContainsFunc(mention.FindAllStringSubmatch(c.Body, -1), func(m []string) bool { return strings.EqualFold(m[1], me) })
-		if mine(c.Author) || c.Author.person() && mentioned {
-			tookPart = true
-		}
-		reacted := slices.ContainsFunc(c.ReactionGroups, func(g struct{ ViewerHasReacted bool }) bool { return g.ViewerHasReacted })
-		if (mine(c.Author) || reacted) && (answered == nil || c.CreatedAt.After(answered.CreatedAt)) {
-			answered = &comments[i]
-		}
-		if c.Author.person() && !mine(c.Author) && (theirs == nil || c.CreatedAt.After(theirs.CreatedAt)) {
-			theirs = &comments[i]
-		}
-	}
+	yours := isMine(n.Author, me)
+	tookPart, theirs, answered := scanComments(allComments(n), me)
 	var rs []reason
-	if pr := n.Type == "PullRequest"; pr && yours {
-		if cs := n.Commits.Nodes; len(cs) > 0 && cs[0].Commit.StatusCheckRollup != nil {
-			if s := cs[0].Commit.StatusCheckRollup.State; s == "FAILURE" || s == "ERROR" {
-				rs = append(rs, reason{Kind: failing, Actor: failedChecks(cs[0].Commit), At: n.UpdatedAt, Key: cs[0].Commit.Oid})
-			}
+	if n.Type == "PullRequest" && yours {
+		if r, ok := failingReason(n); ok {
+			rs = append(rs, r)
 		}
-		var last *ghReview
-		for i, r := range n.Reviews.Nodes {
-			if r.State != "DISMISSED" && r.Author.person() && !mine(r.Author) && (last == nil || r.SubmittedAt.After(last.SubmittedAt)) {
-				last = &n.Reviews.Nodes[i]
-			}
-		}
-		if last != nil {
-			kind := reviewed
-			if last.State == "CHANGES_REQUESTED" {
-				kind = changesRequested
-			}
-			rs = append(rs, reason{Kind: kind, Actor: last.Author.Login, At: last.SubmittedAt, Key: last.ID, Text: last.Body})
+		if r, ok := latestReviewReason(n, me); ok {
+			rs = append(rs, r)
 		}
 	}
-	if (yours || tookPart) && theirs != nil && (answered == nil || theirs.CreatedAt.After(answered.CreatedAt)) {
-		rs = append(rs, reason{Kind: commented, Actor: theirs.Author.Login, At: theirs.CreatedAt, Key: theirs.ID, Text: theirs.Body})
+	if r, ok := commentReason(yours || tookPart, theirs, answered); ok {
+		rs = append(rs, r)
 	}
-	if watched && !mine(n.Author) && !n.IsDraft && n.Author.person() && now.Sub(n.CreatedAt) < 7*24*time.Hour {
-		rs = append(rs, reason{Kind: opened, Actor: n.Author.Login, At: n.CreatedAt, Key: n.ID})
+	if r, ok := openedReason(n, yours, watched, now); ok {
+		rs = append(rs, r)
 	}
 	slices.SortStableFunc(rs, func(a, b reason) int { return int(a.Kind) - int(b.Kind) })
 	return rs
@@ -325,10 +391,12 @@ func failedChecks(c ghCommit) string {
 }
 
 func itemFrom(n ghNode, me string, watched bool, now time.Time) item {
-	it := item{ID: n.ID, URL: n.URL, Title: n.Title, Repo: n.Repository.NameWithOwner, Body: n.Body, Number: n.Number,
+	it := item{
+		ID: n.ID, URL: n.URL, Title: n.Title, Repo: n.Repository.NameWithOwner, Body: n.Body, Number: n.Number,
 		Issue: n.Type == "Issue", Draft: n.IsDraft, Updated: n.UpdatedAt, HeadRef: n.HeadRefName, BaseRef: n.BaseRefName,
 		Decision: n.ReviewDecision, Mergeable: n.Mergeable, Additions: n.Additions, Deletions: n.Deletions, Files: n.ChangedFiles,
-		Reasons: reasonsFor(n, me, watched, now)}
+		Reasons: reasonsFor(n, me, watched, now),
+	}
 	if n.Author != nil {
 		it.Author, it.Yours = n.Author.Login, strings.EqualFold(n.Author.Login, me)
 	}
@@ -378,51 +446,56 @@ func graphql(query string, out any) error {
 	return json.Unmarshal(res.Data, out)
 }
 
-// fetchInbox asks GitHub which items involve you or are new in a watched
-// repository, then fetches the details of only those that changed since prev.
-// It skips the items that accounts on the ignore list opened, and those
-// accounts' comments and reviews on the rest.
-func fetchInbox(prev inbox, watch, ignore []string, now time.Time) (inbox, error) {
-	ignored := ignoring(ignore)
-	searches := []string{"is:open involves:@me updated:>=" + now.AddDate(0, 0, -90).Format(time.DateOnly)}
-	if len(watch) > 0 {
-		searches = append(searches, "is:open updated:>="+now.AddDate(0, 0, -90).Format(time.DateOnly)+" repo:"+strings.Join(watch, " repo:"))
-	}
-	me, updated := "", map[string]time.Time{}
-	for _, q := range searches {
-		after := "null"
-		for {
-			var page struct {
-				Viewer struct{ Login string }
-				Search struct {
-					PageInfo struct {
-						HasNextPage bool
-						EndCursor   string
-					}
-					Nodes []struct {
-						ID        string
-						UpdatedAt time.Time
-						Author    *ghActor
-					}
-				}
-			}
-			err := graphql(fmt.Sprintf(`query { viewer { login } search(query: %q, type: ISSUE, first: 100, after: %s) {
-  pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { id updatedAt author { login __typename } } ... on Issue { id updatedAt author { login __typename } } } } }`, q, after), &page)
-			if err != nil {
-				return prev, err
-			}
-			me = page.Viewer.Login
-			for _, n := range page.Search.Nodes {
-				if !ignored(n.Author.shownLogin()) {
-					updated[n.ID] = n.UpdatedAt
-				}
-			}
-			if !page.Search.PageInfo.HasNextPage {
-				break
-			}
-			after = fmt.Sprintf("%q", page.Search.PageInfo.EndCursor)
+type inboxSearchPage struct {
+	Viewer struct{ Login string }
+	Search struct {
+		PageInfo struct {
+			HasNextPage bool
+			EndCursor   string
+		}
+		Nodes []struct {
+			ID        string
+			UpdatedAt time.Time
+			Author    *ghActor
 		}
 	}
+}
+
+func searchInbox(searches []string, ignored func(string) bool) (string, map[string]time.Time, error) {
+	me, updated := "", map[string]time.Time{}
+	for _, q := range searches {
+		viewer, err := collectSearchPages(q, ignored, updated)
+		if err != nil {
+			return "", nil, err
+		}
+		me = viewer
+	}
+	return me, updated, nil
+}
+
+func collectSearchPages(q string, ignored func(string) bool, updated map[string]time.Time) (string, error) {
+	me, after := "", "null"
+	for {
+		var page inboxSearchPage
+		err := graphql(fmt.Sprintf(`query { viewer { login } search(query: %q, type: ISSUE, first: 100, after: %s) {
+  pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { id updatedAt author { login __typename } } ... on Issue { id updatedAt author { login __typename } } } } }`, q, after), &page)
+		if err != nil {
+			return "", err
+		}
+		me = page.Viewer.Login
+		for _, n := range page.Search.Nodes {
+			if !ignored(n.Author.shownLogin()) {
+				updated[n.ID] = n.UpdatedAt
+			}
+		}
+		if !page.Search.PageInfo.HasNextPage {
+			return me, nil
+		}
+		after = fmt.Sprintf("%q", page.Search.PageInfo.EndCursor)
+	}
+}
+
+func reuseInboxItems(prev inbox, updated map[string]time.Time, ignored func(string) bool, now time.Time) (map[string]item, []string) {
 	kept := map[string]item{}
 	for _, it := range prev.Items {
 		// An item whose reason came from an account ignored since the last
@@ -439,23 +512,57 @@ func fetchInbox(prev inbox, watch, ignore []string, now time.Time) (inbox, error
 			changed = append(changed, id)
 		}
 	}
-	watched := map[string]bool{}
-	for _, r := range watch {
-		watched[strings.ToLower(r)] = true
-	}
+	return kept, changed
+}
+
+type inboxHydrator struct {
+	me      string
+	watched map[string]bool
+	ignored func(string) bool
+	now     time.Time
+}
+
+func (h inboxHydrator) fetchInto(changed []string, kept map[string]item) error {
 	// 25 at a time, since a larger batch of full details times out.
 	for batch := range slices.Chunk(changed, 25) {
 		ids, _ := json.Marshal(batch)
 		var res struct{ Nodes []ghNode }
 		if err := graphql(fmt.Sprintf("query { nodes(ids: %s) {%s\n} }", ids, itemFields), &res); err != nil {
-			return prev, err
+			return err
 		}
 		for _, n := range res.Nodes {
 			if n.ID != "" {
-				n.dropActivityOf(ignored)
-				kept[n.ID] = itemFrom(n, me, watched[strings.ToLower(n.Repository.NameWithOwner)], now)
+				n.dropActivityOf(h.ignored)
+				kept[n.ID] = itemFrom(n, h.me, h.watched[strings.ToLower(n.Repository.NameWithOwner)], h.now)
 			}
 		}
+	}
+	return nil
+}
+
+// fetchInbox asks GitHub which items involve you or are new in a watched
+// repository, then fetches the details of only those that changed since prev.
+// It skips the items that accounts on the ignore list opened, and those
+// accounts' comments and reviews on the rest.
+func fetchInbox(prev inbox, watch, ignore []string, now time.Time) (inbox, error) {
+	ignored := ignoring(ignore)
+	since := now.AddDate(0, 0, -90).Format(time.DateOnly)
+	searches := []string{"is:open involves:@me updated:>=" + since}
+	if len(watch) > 0 {
+		searches = append(searches, "is:open updated:>="+since+" repo:"+strings.Join(watch, " repo:"))
+	}
+	me, updated, err := searchInbox(searches, ignored)
+	if err != nil {
+		return prev, err
+	}
+	kept, changed := reuseInboxItems(prev, updated, ignored, now)
+	watched := map[string]bool{}
+	for _, r := range watch {
+		watched[strings.ToLower(r)] = true
+	}
+	h := inboxHydrator{me: me, watched: watched, ignored: ignored, now: now}
+	if err := h.fetchInto(changed, kept); err != nil {
+		return prev, err
 	}
 	next := inbox{Fetched: now}
 	for _, it := range kept {

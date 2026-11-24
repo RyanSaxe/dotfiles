@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"regexp"
 	"strings"
+	"workspace/kitty"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
@@ -21,8 +22,6 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	gmtext "github.com/yuin/goldmark/text"
-
-	"workspace/kitty"
 )
 
 // Options are what rendering needs from the program around it.
@@ -96,35 +95,66 @@ func (b block) next(line string) (block, step) {
 	return b, text
 }
 
+type docBuilder struct {
+	doc          Doc
+	lines        []string
+	diagramLines []string
+	o            Options
+}
+
+func (db *docBuilder) flush() {
+	if len(db.lines) > 0 {
+		db.doc = append(db.doc, part{text: joinSoftBreaks(strings.Join(db.lines, "\n"))})
+		db.lines = nil
+	}
+}
+
+func (db *docBuilder) picture(alt, src string, load func() (image.Image, error)) {
+	db.flush()
+	p := part{alt: alt}
+	if img, err := load(); err == nil {
+		var data bytes.Buffer
+		if png.Encode(&data, img) == nil {
+			p.png, p.size = data.Bytes(), img.Bounds().Size()
+		}
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(src))
+	p.id = kitty.ID(h.Sum32()&0xffffff | 0x010000) // a 24-bit color, never black
+	db.doc = append(db.doc, p)
+}
+
+func (db *docBuilder) endDiagram(line string) {
+	if db.o.Mermaid == nil {
+		db.lines = append(append(append(db.lines, "```mermaid"), db.diagramLines...), line)
+	} else {
+		src := strings.Join(db.diagramLines, "\n")
+		db.picture("mermaid diagram", src, func() (image.Image, error) { return db.o.Mermaid(src, db.o.Dark) })
+	}
+	db.diagramLines = nil
+}
+
+func (db *docBuilder) addImageLine(line string) bool {
+	if m := imageLine.FindStringSubmatch(line); m != nil {
+		db.picture(m[1], m[2], func() (image.Image, error) { return db.o.Fetch(m[2]) })
+		return true
+	}
+	if m := imgTag.FindStringSubmatch(line); m != nil {
+		alt := ""
+		if a := imgAlt.FindStringSubmatch(line); a != nil {
+			alt = a[1]
+		}
+		db.picture(alt, m[1], func() (image.Image, error) { return db.o.Fetch(m[1]) })
+		return true
+	}
+	return false
+}
+
 // Load splits md and loads its pictures. It belongs off the UI, because
 // pictures come over the network and a diagram can take seconds the first
 // time. A picture that fails to load keeps only its description.
 func Load(md string, o Options) Doc {
-	var d Doc
-	var lines, diagramLines []string
-	flush := func() {
-		if len(lines) > 0 {
-			d = append(d, part{text: joinSoftBreaks(strings.Join(lines, "\n"))})
-			lines = nil
-		}
-	}
-	picture := func(alt, src string, load func() (image.Image, error)) {
-		flush()
-		p := part{alt: alt}
-		if img, err := load(); err == nil {
-			var data bytes.Buffer
-			if png.Encode(&data, img) == nil {
-				p.png, p.size = data.Bytes(), img.Bounds().Size()
-			}
-		}
-		h := fnv.New32a()
-		h.Write([]byte(src))
-		p.id = kitty.ID(h.Sum32()&0xffffff | 0x010000) // a 24-bit color, never black
-		d = append(d, p)
-	}
-	fetch := func(src string) func() (image.Image, error) {
-		return func() (image.Image, error) { return o.Fetch(src) }
-	}
+	db := docBuilder{o: o}
 	// glamour keeps tabs, and the pane widens them to four spaces after the
 	// layout, so code lines would run past the edge.
 	md = strings.NewReplacer("\r", "", "\t", "    ").Replace(htmlComment.ReplaceAllString(md, ""))
@@ -133,32 +163,20 @@ func Load(md string, o Options) Doc {
 		var s step
 		was := b
 		b, s = b.next(line)
-		switch {
-		case s == openDiagram:
-		case s == diagram:
-			diagramLines = append(diagramLines, line)
-		case s == endDiagram && o.Mermaid == nil:
-			lines = append(append(append(lines, "```mermaid"), diagramLines...), line)
-			diagramLines = nil
-		case s == endDiagram:
-			src := strings.Join(diagramLines, "\n")
-			picture("mermaid diagram", src, func() (image.Image, error) { return o.Mermaid(src, o.Dark) })
-			diagramLines = nil
-		case was == prose && b == prose && imageLine.MatchString(line):
-			m := imageLine.FindStringSubmatch(line)
-			picture(m[1], m[2], fetch(m[2]))
-		case was == prose && b == prose && imgTag.MatchString(line):
-			src, alt := imgTag.FindStringSubmatch(line)[1], ""
-			if a := imgAlt.FindStringSubmatch(line); a != nil {
-				alt = a[1]
-			}
-			picture(alt, src, fetch(src))
+		switch s {
+		case openDiagram:
+		case diagram:
+			db.diagramLines = append(db.diagramLines, line)
+		case endDiagram:
+			db.endDiagram(line)
 		default:
-			lines = append(lines, line)
+			if was != prose || b != prose || !db.addImageLine(line) {
+				db.lines = append(db.lines, line)
+			}
 		}
 	}
-	flush()
-	return d
+	db.flush()
+	return db.doc
 }
 
 // glamour joins the lines of a paragraph but keeps each line of a list item
@@ -176,14 +194,9 @@ func joinSoftBreaks(md string) string {
 		if !ok || !entering || !t.SoftLineBreak() {
 			return ast.WalkContinue, nil
 		}
-		end := t.Segment.Stop
-		for end < len(src) && (src[end] == ' ' || src[end] == '\t') {
-			end++
-		}
-		if end == len(src) || src[end] != '\n' {
+		end, ok := softBreakEnd(src, t.Segment.Stop)
+		if !ok {
 			return ast.WalkContinue, nil
-		}
-		for end++; end < len(src) && strings.IndexByte(" \t>", src[end]) >= 0; end++ {
 		}
 		out = append(append(out, src[kept:t.Segment.Stop]...), ' ')
 		kept = end
@@ -192,10 +205,22 @@ func joinSoftBreaks(md string) string {
 	return string(append(out, src[kept:]...))
 }
 
-// Render lays the doc out w columns wide. A picture becomes Kitty
-// placeholders, with the image sent on its first row, or one line of its
-// description where the terminal can't draw images.
-func (d Doc) Render(w int, o Options) string {
+func softBreakEnd(src []byte, stop int) (int, bool) {
+	end := stop
+	for end < len(src) && (src[end] == ' ' || src[end] == '\t') {
+		end++
+	}
+	if end == len(src) || src[end] != '\n' {
+		return 0, false
+	}
+	end++
+	for end < len(src) && strings.IndexByte(" \t>", src[end]) >= 0 {
+		end++
+	}
+	return end, true
+}
+
+func resolveStyle(o Options) ansi.StyleConfig {
 	var style ansi.StyleConfig
 	if o.Style == nil || json.Unmarshal(o.Style, &style) != nil {
 		theme := "catppuccin-mocha"
@@ -209,6 +234,33 @@ func (d Doc) Render(w int, o Options) string {
 	}
 	zero := uint(0)
 	style.Document.Margin, style.CodeBlock.Margin = &zero, &zero
+	return style
+}
+
+func renderPart(r *glamour.TermRenderer, p part, w int, o Options) []string {
+	switch {
+	case p.text != "":
+		s, err := r.Render(p.text)
+		if err != nil {
+			s = p.text
+		}
+		return []string{strings.Trim(s, "\n")}
+	case p.png == nil || !o.Terminal.Draws:
+		return []string{"", dim.Render("▣ " + cmp.Or(p.alt, "picture")), ""}
+	default:
+		// A cell is about twice as tall as it is wide, and a picture is
+		// never drawn wider than its pixels at 8 a column.
+		cols := min(w, max(1, p.size.X/8))
+		rows := max(1, min(40, (cols*p.size.Y+p.size.X)/(2*p.size.X)))
+		return []string{"", o.Terminal.Image(p.png, p.id, cols, rows) + kitty.Placeholders(p.id, cols, rows), ""}
+	}
+}
+
+// Render lays the doc out w columns wide. A picture becomes Kitty
+// placeholders, with the image sent on its first row, or one line of its
+// description where the terminal can't draw images.
+func (d Doc) Render(w int, o Options) string {
+	style := resolveStyle(o)
 	// glamour's code formatter defaults to 256 colors, which shifts the
 	// style's.
 	r, err := glamour.NewTermRenderer(glamour.WithStyles(style), glamour.WithWordWrap(w), glamour.WithColorProfile(termenv.TrueColor), glamour.WithChromaFormatter("terminal16m"))
@@ -217,22 +269,7 @@ func (d Doc) Render(w int, o Options) string {
 	}
 	var out []string
 	for _, p := range d {
-		switch {
-		case p.text != "":
-			s, err := r.Render(p.text)
-			if err != nil {
-				s = p.text
-			}
-			out = append(out, strings.Trim(s, "\n"))
-		case p.png == nil || !o.Terminal.Draws:
-			out = append(out, "", dim.Render("▣ "+cmp.Or(p.alt, "picture")), "")
-		default:
-			// A cell is about twice as tall as it is wide, and a picture is
-			// never drawn wider than its pixels at 8 a column.
-			cols := min(w, max(1, p.size.X/8))
-			rows := max(1, min(40, (cols*p.size.Y+p.size.X)/(2*p.size.X)))
-			out = append(out, "", o.Terminal.Image(p.png, p.id, cols, rows)+kitty.Placeholders(p.id, cols, rows), "")
-		}
+		out = append(out, renderPart(r, p, w, o)...)
 	}
 	return strings.Join(out, "\n")
 }

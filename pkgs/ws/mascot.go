@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"cmp"
-
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +17,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-
 	"workspace/kitty"
 	"workspace/popup"
 )
@@ -80,39 +78,50 @@ func fetchPokemon(name string, shiny bool) (mascot, error) {
 	if errS == nil && errP == nil {
 		return m, nil
 	}
-	data, err := get("https://pokeapi.co/api/v2/pokemon/" + name)
+	sprite, artwork, err := pokemonURLs(name, variant)
 	if err != nil {
 		return m, err
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return m, err
+	}
+	for path, url := range map[string]string{m.sprite: sprite, m.palette: artwork} {
+		if err := downloadFile(path, url); err != nil {
+			return m, err
+		}
+	}
+	return m, nil
+}
+
+func pokemonURLs(name, variant string) (sprite, artwork string, err error) {
+	data, err := get("https://pokeapi.co/api/v2/pokemon/" + name)
+	if err != nil {
+		return "", "", err
 	}
 	var info struct {
 		Sprites map[string]any
 	}
 	if err := json.Unmarshal(data, &info); err != nil {
-		return m, err
+		return "", "", err
 	}
-	sprite, _ := info.Sprites[variant].(string)
-	artwork := ""
+	sprite, _ = info.Sprites[variant].(string)
 	if other, ok := info.Sprites["other"].(map[string]any); ok {
 		if art, ok := other["official-artwork"].(map[string]any); ok {
 			artwork, _ = art[variant].(string)
 		}
 	}
 	if sprite == "" || artwork == "" {
-		return m, fmt.Errorf("PokeAPI has no %s pictures of %s", strings.TrimPrefix(variant, "front_"), name)
+		return "", "", fmt.Errorf("PokeAPI has no %s pictures of %s", strings.TrimPrefix(variant, "front_"), name)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return m, err
+	return sprite, artwork, nil
+}
+
+func downloadFile(path, url string) error {
+	data, err := get(url)
+	if err != nil {
+		return err
 	}
-	for path, url := range map[string]string{m.sprite: sprite, m.palette: artwork} {
-		data, err := get(url)
-		if err == nil {
-			err = os.WriteFile(path, data, 0o644)
-		}
-		if err != nil {
-			return m, err
-		}
-	}
-	return m, nil
+	return os.WriteFile(path, data, 0o600)
 }
 
 func get(url string) ([]byte, error) {
@@ -125,7 +134,7 @@ func get(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s: %s", url, resp.Status)
 	}
@@ -135,27 +144,35 @@ func get(url string) ([]byte, error) {
 // pokemonNames lists every Pokémon, fetched once and cached.
 func pokemonNames() ([]string, error) {
 	file := filepath.Join(mascotCache, "pokemon", "names.txt")
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec // reads cached Pokémon name list from mascotCache
 	if errors.Is(err, os.ErrNotExist) {
-		var list []byte
-		if list, err = get("https://pokeapi.co/api/v2/pokemon/?limit=100000"); err == nil {
-			var res struct{ Results []struct{ Name string } }
-			if err = json.Unmarshal(list, &res); err == nil {
-				var b strings.Builder
-				for _, r := range res.Results {
-					b.WriteString(r.Name + "\n")
-				}
-				data = []byte(b.String())
-				os.MkdirAll(filepath.Dir(file), 0o755)
-				err = os.WriteFile(file, data, 0o644)
-			}
-		}
+		data, err = fetchPokemonNames(file)
 	}
 	return strings.Fields(string(data)), err
 }
 
+func fetchPokemonNames(file string) ([]byte, error) {
+	list, err := get("https://pokeapi.co/api/v2/pokemon/?limit=100000")
+	if err != nil {
+		return nil, err
+	}
+	var res struct{ Results []struct{ Name string } }
+	if err := json.Unmarshal(list, &res); err != nil {
+		return nil, err
+	}
+	var b strings.Builder
+	for _, r := range res.Results {
+		b.WriteString(r.Name + "\n")
+	}
+	data := []byte(b.String())
+	if err := os.MkdirAll(filepath.Dir(file), 0o750); err != nil {
+		return nil, err
+	}
+	return data, os.WriteFile(file, data, 0o600)
+}
+
 func loadPNG(path string) (image.Image, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // reads cached or user-selected local mascot PNG
 	if err != nil {
 		return nil, err
 	}
@@ -176,9 +193,18 @@ const hueBuckets = 24 // 15 degrees each
 // mochaAccents are Catppuccin's accents that carry a hue. rosewater and
 // flamingo are near white, so they never win.
 var mochaAccents = []struct{ name, hex string }{
-	{"pink", "#f5c2e7"}, {"mauve", "#cba6f7"}, {"red", "#f38ba8"}, {"maroon", "#eba0ac"},
-	{"peach", "#fab387"}, {"yellow", "#f9e2af"}, {"green", "#a6e3a1"}, {"teal", "#94e2d5"},
-	{"sky", "#89dceb"}, {"sapphire", "#74c7ec"}, {"blue", "#89b4fa"}, {"lavender", "#b4befe"},
+	{"pink", "#f5c2e7"},
+	{"mauve", "#cba6f7"},
+	{"red", "#f38ba8"},
+	{"maroon", "#eba0ac"},
+	{"peach", "#fab387"},
+	{"yellow", "#f9e2af"},
+	{"green", "#a6e3a1"},
+	{"teal", "#94e2d5"},
+	{"sky", "#89dceb"},
+	{"sapphire", "#74c7ec"},
+	{"blue", "#89b4fa"},
+	{"lavender", "#b4befe"},
 }
 
 func mascotAccent(img image.Image) (string, error) {
@@ -198,33 +224,38 @@ func mascotAccent(img image.Image) (string, error) {
 // not sampling, keeps small features such as eyes.
 func gatherPixels(img image.Image) (vivid, pale []hsv) {
 	b := img.Bounds()
-	side := max(b.Dx(), b.Dy())
-	cell := max(1, float64(side)/96)
+	cell := max(1, float64(max(b.Dx(), b.Dy()))/96)
 	for ty := 0; float64(ty)*cell < float64(b.Dy()); ty++ {
 		for tx := 0; float64(tx)*cell < float64(b.Dx()); tx++ {
-			var r, g, bl, a float64
-			n := 0
-			for y := b.Min.Y + int(float64(ty)*cell); y < min(b.Max.Y, b.Min.Y+int(float64(ty+1)*cell)); y++ {
-				for x := b.Min.X + int(float64(tx)*cell); x < min(b.Max.X, b.Min.X+int(float64(tx+1)*cell)); x++ {
-					c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
-					w := float64(c.A) // color weighs by its opacity
-					r, g, bl, a, n = r+float64(c.R)*w, g+float64(c.G)*w, bl+float64(c.B)*w, a+w, n+1
-				}
-			}
-			if n == 0 || a/float64(n) < 128 {
+			p, ok := averageCell(img, tx, ty, cell)
+			if !ok || p.v < 0.2 || p.v > 0.98 { // black and white carry no hue
 				continue
 			}
-			p := toHSV(r/a/255, g/a/255, bl/a/255)
-			switch {
-			case p.v < 0.2 || p.v > 0.98: // black and white carry no hue
-			case p.s >= 0.25:
+			if p.s >= 0.25 {
 				vivid = append(vivid, p)
-			case p.s >= 0.10:
+			} else if p.s >= 0.10 {
 				pale = append(pale, p)
 			}
 		}
 	}
 	return vivid, pale
+}
+
+func averageCell(img image.Image, tx, ty int, cell float64) (hsv, bool) {
+	b := img.Bounds()
+	var r, g, bl, a float64
+	n := 0
+	for y := b.Min.Y + int(float64(ty)*cell); y < min(b.Max.Y, b.Min.Y+int(float64(ty+1)*cell)); y++ {
+		for x := b.Min.X + int(float64(tx)*cell); x < min(b.Max.X, b.Min.X+int(float64(tx+1)*cell)); x++ {
+			c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			w := float64(c.A) // color weighs by its opacity
+			r, g, bl, a, n = r+float64(c.R)*w, g+float64(c.G)*w, bl+float64(c.B)*w, a+w, n+1
+		}
+	}
+	if n == 0 || a/float64(n) < 128 {
+		return hsv{}, false
+	}
+	return toHSV(r/a/255, g/a/255, bl/a/255), true
 }
 
 func bucket(h float64) int { return int(h*hueBuckets) % hueBuckets }
@@ -275,15 +306,7 @@ func pickPair(vivid, pale []hsv) (hsv, hsv) {
 	if len(lead) == 0 { // a mascot painted only in dusty colors, such as mewtwo
 		lead = pale
 	}
-	main := lead
-	if len(vivid) > 0 {
-		main = slices.Clone(vivid)
-		for _, p := range pale {
-			if p.s >= tinted {
-				main = append(main, p)
-			}
-		}
-	}
+	main := mainPixels(vivid, pale)
 	primary := strongest(weights(main))
 	accent := representative(main, primary)
 	lw := weights(lead)
@@ -294,17 +317,34 @@ func pickPair(vivid, pale []hsv) (hsv, hsv) {
 		gap int
 	}{{lead, lw, 3}, {lead, lw, 2}, {pale, weights(pale), 2}}
 	for _, t := range tiers {
-		best := -1
-		for i := range t.w {
-			if bucketGap(i, primary) >= t.gap && t.w[i] > threshold && (best < 0 || t.w[i] > t.w[best]) {
-				best = i
-			}
-		}
-		if best >= 0 {
+		if best := bestOtherBucket(t.w, primary, t.gap, threshold); best >= 0 {
 			return accent, representative(t.px, best)
 		}
 	}
 	return accent, accent
+}
+
+func mainPixels(vivid, pale []hsv) []hsv {
+	if len(vivid) == 0 {
+		return pale
+	}
+	main := slices.Clone(vivid)
+	for _, p := range pale {
+		if p.s >= tinted {
+			main = append(main, p)
+		}
+	}
+	return main
+}
+
+func bestOtherBucket(w []float64, primary, gap int, threshold float64) int {
+	best := -1
+	for i := range w {
+		if bucketGap(i, primary) >= gap && w[i] > threshold && (best < 0 || w[i] > w[best]) {
+			best = i
+		}
+	}
+	return best
 }
 
 // strongest is the bucket with the most weight.
@@ -337,7 +377,7 @@ func nearestAccent(rgb [3]float64) string {
 		var c [3]float64
 		for i := range c {
 			var n int
-			fmt.Sscanf(a.hex[1+2*i:3+2*i], "%x", &n)
+			_, _ = fmt.Sscanf(a.hex[1+2*i:3+2*i], "%x", &n)
 			c[i] = float64(n) / 255
 		}
 		d := math.Abs(okHue(c) - h)
@@ -407,6 +447,32 @@ func fromHSV(h, s, v float64) (r, g, b float64) {
 
 // ----- drawing -------------------------------------------------------------
 
+type opaquePixel struct {
+	c  color.NRGBA
+	ok bool
+}
+
+func sampleOpaque(img image.Image, box image.Rectangle, x, y int) opaquePixel {
+	if x >= box.Max.X || y >= box.Max.Y {
+		return opaquePixel{}
+	}
+	c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+	return opaquePixel{c: c, ok: c.A >= 128}
+}
+
+func writeHalfBlock(b *strings.Builder, top, bot opaquePixel) {
+	switch {
+	case top.ok && bot.ok:
+		fmt.Fprintf(b, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀\x1b[m", top.c.R, top.c.G, top.c.B, bot.c.R, bot.c.G, bot.c.B)
+	case top.ok:
+		fmt.Fprintf(b, "\x1b[38;2;%d;%d;%dm▀\x1b[m", top.c.R, top.c.G, top.c.B)
+	case bot.ok:
+		fmt.Fprintf(b, "\x1b[38;2;%d;%d;%dm▄\x1b[m", bot.c.R, bot.c.G, bot.c.B)
+	default:
+		b.WriteByte(' ')
+	}
+}
+
 // drawSprite draws a picture in text, two pixels to a cell with half
 // blocks in true color, cropped to what is opaque and shrunk to fit w
 // cells by h cells. It shows wherever the terminal does, a phone included.
@@ -416,28 +482,10 @@ func drawSprite(img image.Image, w, h int) string {
 		return ""
 	}
 	step := max(1, (box.Dx()+w-1)/w, (box.Dy()+2*h-1)/(2*h))
-	at := func(x, y int) (color.NRGBA, bool) {
-		if x >= box.Max.X || y >= box.Max.Y {
-			return color.NRGBA{}, false
-		}
-		c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
-		return c, c.A >= 128
-	}
 	var b strings.Builder
 	for y := box.Min.Y; y < box.Max.Y; y += 2 * step {
 		for x := box.Min.X; x < box.Max.X; x += step {
-			top, hasTop := at(x, y)
-			bot, hasBot := at(x, y+step)
-			switch {
-			case hasTop && hasBot:
-				fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀\x1b[m", top.R, top.G, top.B, bot.R, bot.G, bot.B)
-			case hasTop:
-				fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm▀\x1b[m", top.R, top.G, top.B)
-			case hasBot:
-				fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm▄\x1b[m", bot.R, bot.G, bot.B)
-			default:
-				b.WriteByte(' ')
-			}
+			writeHalfBlock(&b, sampleOpaque(img, box, x, y), sampleOpaque(img, box, x, y+step))
 		}
 		b.WriteByte('\n')
 	}
@@ -491,6 +539,8 @@ func mascotArt(rows int, term kitty.Terminal) popup.Art {
 	crop := image.NewNRGBA(image.Rect(0, 0, box.Dx(), box.Dy()))
 	draw.Draw(crop, crop.Bounds(), img, box.Min, draw.Src)
 	var data bytes.Buffer
-	png.Encode(&data, crop)
+	if err := png.Encode(&data, crop); err != nil {
+		return popup.Art{}
+	}
 	return popup.Art{Cells: kitty.Placeholders(mascotImageID, cols, rows), Setup: term.Image(data.Bytes(), mascotImageID, cols, rows), Cols: cols, Rows: rows}
 }

@@ -10,6 +10,15 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
 
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.5
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+        # Keep ruff-format on code files so prose examples in Markdown stay aligned.
+        types_or: [python, pyi, jupyter]
+
   - repo: local
     hooks:
       - id: nixfmt
@@ -20,11 +29,48 @@ repos:
         # One nix process at a time, or each waits on the flake lock.
         require_serial: true
 
+      - id: deadnix
+        name: deadnix
+        entry: deadnix --fail
+        language: system
+        files: \.nix$
+
+      - id: statix
+        name: statix
+        entry: statix check
+        language: system
+        files: \.nix$
+        pass_filenames: false
+
+      - id: ty
+        name: ty
+        # theme/desktop.py imports numpy and pillow from the Nix Python env.
+        entry: uvx --with numpy --with pillow ty@0.0.105 check
+        language: system
+        types: [python]
+        pass_filenames: false
+
       - id: stylua
         name: stylua
         entry: stylua
         language: system
-        files: ^config/(nvim|rex)/.*\.lua$
+        files: \.lua$
+
+      - id: emmylua-check
+        name: emmylua-check
+        entry: >-
+          sh -c 'VIMRUNTIME="$(nvim --clean --headless -u NONE +"lua io.write(vim.env.VIMRUNTIME)" +q)"
+          emmylua_check -c .emmyrc.json --severity error config/nvim config/rex pkgs/ws/mux'
+        language: system
+        files: (\.lua$|^\.emmyrc\.json$)
+        pass_filenames: false
+
+      - id: luacheck-complexity
+        name: luacheck (complexity)
+        # Only code 561 (cyclomatic complexity); emmylua_check owns static analysis.
+        entry: luacheck --no-config --only 561 --max-cyclomatic-complexity 10
+        language: system
+        files: \.lua$
 
       - id: nvim-queries
         name: Neovim's context queries parse
@@ -41,9 +87,33 @@ repos:
         # shfmt has no zsh dialect.
         exclude: '\.zsh$|^config/zsh/zshrc(\.minimal)?$'
 
+      - id: shellcheck
+        name: shellcheck
+        # Check POSIX sh, bash and dash scripts; skip zsh scripts.
+        entry: >-
+          sh -c 'rc=0; for f in "$@"; do
+            case "$f" in *.zsh) continue ;; esac
+            case "$(head -n 1 "$f")" in *zsh*) continue ;; esac
+            shellcheck "$f" || rc=1
+          done; exit $rc' --
+        language: system
+        types: [shell]
+
+      - id: zsh-syntax
+        name: zsh syntax check
+        entry: >-
+          sh -c 'rc=0; for f in "$@"; do
+            case "$f" in
+              *.zsh|config/zsh/zshrc|config/zsh/zshrc.minimal) zsh -n "$f" || rc=1 ;;
+              *) case "$(head -n 1 "$f")" in *zsh*) zsh -n "$f" || rc=1 ;; esac ;;
+            esac
+          done; exit $rc' --
+        language: system
+        files: (\.zsh$|\.sh$|^config/zsh/zshrc(\.minimal)?$|^config/sketchybar/sketchybarrc$)
+
       - id: ws
-        name: gofmt, go vet and go test (ws)
-        entry: sh -c 'cd pkgs/ws && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
+        name: golangci-lint and go test (ws)
+        entry: sh -c 'cd pkgs/ws && golangci-lint fmt && golangci-lint run && go test ./...'
         language: system
         files: ^pkgs/ws/
         pass_filenames: false

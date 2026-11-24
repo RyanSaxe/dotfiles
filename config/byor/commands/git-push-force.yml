@@ -1,0 +1,21 @@
+id: git-push-force
+language: Bash
+severity: error
+message: "`git push --force` overwrites remote history without checking for newer commits."
+rule:
+  kind: command
+  all:
+    - has:
+        field: name
+        regex: (^|/)git$
+    - has:
+        kind: word
+        regex: ^push$
+    - has:
+        kind: word
+        regex: ^(--force|-[A-Za-z]*f[A-Za-z]*)$
+metadata:
+  byor:
+    rationale: Bare force pushes silently erase commits pushed by another session or collaborator.
+    agent_prompt: Use `git push --force-with-lease` on a feature branch instead, or ask the user before overwriting remote history.
+    tags: [git, safety]

@@ -38,7 +38,7 @@ func trustFolder(root string) error {
 // write. Only root's entry is decoded, so every other value keeps the bytes
 // Claude Code wrote.
 func trustInClaude(file, root string) error {
-	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) { //nolint:gosec // checks local Claude config from CLAUDE_CONFIG_DIR or ~
 		return nil
 	}
 	unlock, err := lockBeside(file)
@@ -46,7 +46,7 @@ func trustInClaude(file, root string) error {
 		return err
 	}
 	defer unlock()
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec // reads local Claude config from CLAUDE_CONFIG_DIR or ~
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func encodeJSON(v any, indent string) (json.RawMessage, error) {
 // trustInCodex sets projects."root".trust_level to "trusted" in Codex's
 // config.toml.
 func trustInCodex(file, root string) error {
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec // reads local Codex config from CODEX_HOME or ~/.codex
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	} else if err != nil {
@@ -136,7 +136,7 @@ func trustInCodex(file, root string) error {
 // trustInAntigravity appends root to trustedWorkspaces in Antigravity's
 // settings.json, leaving every other setting as Antigravity wrote it.
 func trustInAntigravity(file, root string) error {
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec // reads local Antigravity settings from ANTIGRAVITY_APP_DATA_DIR or ~/.gemini
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	} else if err != nil {
@@ -172,15 +172,15 @@ func trustInAntigravity(file, root string) error {
 func lockBeside(file string) (unlock func(), err error) {
 	lock := file + ".lock"
 	for waited := time.Duration(0); ; waited += 50 * time.Millisecond {
-		err := os.Mkdir(lock, 0o755)
+		err := os.Mkdir(lock, 0o750) //nolint:gosec // creates proper-lockfile directory beside local agent config
 		if err == nil {
-			return func() { os.Remove(lock) }, nil
+			return func() { _ = os.Remove(lock) }, nil //nolint:gosec // releases lock directory created above
 		}
 		if !errors.Is(err, fs.ErrExist) {
 			return nil, err
 		}
-		if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > 10*time.Second {
-			if err := os.Remove(lock); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > 10*time.Second { //nolint:gosec // checks stale lock directory beside local agent config
+			if err := os.Remove(lock); err != nil && !errors.Is(err, fs.ErrNotExist) { //nolint:gosec // removes stale lock directory beside local agent config
 				return nil, fmt.Errorf("taking over %s, which was left for %s: %w", tilde(lock), time.Since(info.ModTime()).Round(time.Second), err)
 			}
 			continue

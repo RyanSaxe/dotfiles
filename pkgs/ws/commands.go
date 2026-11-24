@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-
 	"workspace/mux"
 )
 
@@ -295,7 +294,7 @@ Then ws focus agent goes to the agent that needs you first, and to the next one 
 runs, or to each agent in turn when none needs you. reviews opens the Inbox on Needs you, and
 tasks on its first Tasks tab. AeroSpace's Cmd-Alt-A, T and R run it.`,
 		examples: []string{"ws focus agent", "ws focus reviews"},
-		run: func(b mux.Backend, c call) error {
+		run: func(_ mux.Backend, c call) error {
 			return focus(c.args[0])
 		},
 	},
@@ -310,7 +309,7 @@ config from the host file's dotfiles.ws.agent, and Claude Code's and Codex's set
 modules/home/agents.nix. ws starts the agent with no flags of its own, and ws new and ws pr
 pass it the words after their --, which override its settings for that session.`,
 		examples: []string{"ws agent", "ws new fix-login -- --effort high"},
-		run: func(b mux.Backend, c call) error {
+		run: func(mux.Backend, call) error {
 			return printAgent()
 		},
 	},
@@ -321,7 +320,7 @@ pass it the words after their --, which override its settings for that session.`
 		about: `Set the popups' mascot, which also gives them their accent color. NAME is a Pokémon, such as
 pikachu, shiny-pokemon:NAME for its shiny form, or a PNG file. The theme popup sets it too.`,
 		examples: []string{"ws mascot pikachu", "ws mascot shiny-pokemon:gengar", "ws mascot ~/Pictures/cat.png"},
-		run: func(b mux.Backend, c call) error {
+		run: func(_ mux.Backend, c call) error {
 			return setMascot(c.args[0])
 		},
 	},
@@ -426,39 +425,51 @@ func run(name string, words []string, backend func(client string) mux.Backend) e
 // arguments, and each flag's value follows it or an =.
 func (c command) parse(words []string) (call, error) {
 	in := call{flags: map[string]string{}}
-words:
 	for i := 0; i < len(words); i++ {
 		w := words[i]
 		if !strings.HasPrefix(w, "-") || w == "-" {
 			in.args = append(in.args, w)
 			continue
 		}
-		flag, value, hasValue := strings.Cut(w, "=")
-		name := strings.TrimLeft(flag, "-")
-		j := slices.IndexFunc(c.flags, func(o option) bool { return o.name == name })
-		switch {
-		case j < 0:
-			return in, fmt.Errorf("%s isn't a flag of ws %s, which takes %s", flag, c.name, c.flagNames())
-		case name == "":
-			in.agentWords = words[i+1:]
-			break words
-		case c.flags[j].value == "" && hasValue:
-			return in, fmt.Errorf("%s takes no value", flag)
-		case c.flags[j].value == "":
-			in.flags[name] = "true"
-		case !hasValue && i+1 == len(words):
-			return in, fmt.Errorf("%s needs %s after it", flag, c.flags[j].value)
-		case !hasValue:
-			i++
-			in.flags[name] = words[i]
-		default:
-			in.flags[name] = value
+		var done bool
+		var err error
+		i, done, err = c.parseFlag(words, i, &in)
+		if err != nil {
+			return in, err
+		}
+		if done {
+			break
 		}
 	}
 	if want := len(strings.Fields(c.args)); len(in.args) != want {
 		return in, fmt.Errorf("it takes %s, see ws %s --help", cmp.Or(c.args, "no arguments"), c.name)
 	}
 	return in, nil
+}
+
+func (c command) parseFlag(words []string, i int, in *call) (int, bool, error) {
+	flag, value, hasValue := strings.Cut(words[i], "=")
+	name := strings.TrimLeft(flag, "-")
+	j := slices.IndexFunc(c.flags, func(o option) bool { return o.name == name })
+	switch {
+	case j < 0:
+		return i, false, fmt.Errorf("%s isn't a flag of ws %s, which takes %s", flag, c.name, c.flagNames())
+	case name == "":
+		in.agentWords = words[i+1:]
+		return i, true, nil
+	case c.flags[j].value == "" && hasValue:
+		return i, false, fmt.Errorf("%s takes no value", flag)
+	case c.flags[j].value == "":
+		in.flags[name] = "true"
+	case !hasValue && i+1 == len(words):
+		return i, false, fmt.Errorf("%s needs %s after it", flag, c.flags[j].value)
+	case !hasValue:
+		i++
+		in.flags[name] = words[i]
+	default:
+		in.flags[name] = value
+	}
+	return i, false, nil
 }
 
 // flagNames lists the command's flags, but not its --.
