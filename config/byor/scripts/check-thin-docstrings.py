@@ -26,6 +26,14 @@ RUST_DECL_RE = re.compile(
     r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:fn|struct|enum|trait)\s+([A-Za-z_]\w*)"
 )
 LUA_DECL_RE = re.compile(r"^\s*(?:local\s+)?function\s+([A-Za-z_][\w.:]*)")
+DELETE_PROMPT = (
+    "Delete it completely (do not replace it with a `#` or `//` comment that restates the signature); "
+    "expand only to document non-obvious invariants or constraints."
+)
+LUA_DELETE_PROMPT = (
+    "Delete prose that restates the name (keep `@param`/`@return` type annotations, and do not replace it with a "
+    "`--` comment that restates the signature); expand only to document a non-obvious invariant."
+)
 
 
 def check_python(raw: str, text: str) -> list[str]:
@@ -43,8 +51,7 @@ def check_python(raw: str, text: str) -> list[str]:
         non_empty = [line for line in doc.splitlines() if line.strip()]
         if 1 <= len(non_empty) <= 2:
             findings.append(
-                f"{raw}:{node.lineno}: thin {len(non_empty)}-line docstring on `{node.name}`. "
-                "Delete it if clear names and types already explain it; expand only to document non-obvious invariants or constraints."
+                f"{raw}:{node.lineno}: thin {len(non_empty)}-line docstring on `{node.name}`. {DELETE_PROMPT}"
             )
     return findings
 
@@ -88,8 +95,7 @@ def check_js(raw: str, text: str) -> list[str]:
                     if 1 <= len(cleaned_lines) <= 2:
                         name = next((g for g in match.groups() if g), "declaration")
                         findings.append(
-                            f"{raw}:{start + 1}: thin {len(cleaned_lines)}-line JSDoc on `{name}`. "
-                            "Delete it if clear names and types already explain it; expand only to document non-obvious invariants or constraints."
+                            f"{raw}:{start + 1}: thin {len(cleaned_lines)}-line JSDoc on `{name}`. {DELETE_PROMPT}"
                         )
         idx += 1
     return findings
@@ -116,8 +122,7 @@ def check_rust(raw: str, text: str) -> list[str]:
                 match = RUST_DECL_RE.match(lines[decl_idx])
                 if match:
                     findings.append(
-                        f"{raw}:{start + 1}: thin {len(doc_lines)}-line doc comment on `{match.group(1)}`. "
-                        "Delete it if clear names and types already explain it; expand only to document non-obvious invariants or constraints."
+                        f"{raw}:{start + 1}: thin {len(doc_lines)}-line doc comment on `{match.group(1)}`. {DELETE_PROMPT}"
                     )
             continue
         idx += 1
@@ -143,7 +148,7 @@ def check_lua(raw: str, text: str) -> list[str]:
                 if match:
                     findings.append(
                         f"{raw}:{start + 1}: thin {len(prose_lines)}-line Lua doc comment on `{match.group(1)}`. "
-                        "Delete prose that restates the name (keep `@param`/`@return` type annotations), or expand if it explains a non-obvious invariant."
+                        f"{LUA_DELETE_PROMPT}"
                     )
             continue
         idx += 1
