@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.4.0
       - uses: actions/cache@v6
         with:
           path: ~/.cache/prek
@@ -38,15 +38,30 @@ jobs:
           version: v2.1.6
           install-only: true
 
-      # Lua: install pinned stylua and emmylua_check binaries for prek.
+      # Lua: install pinned stylua, emmylua_check and luacheck for prek.
       - uses: taiki-e/install-action@v2
         with:
           tool: stylua@2.1.0
-      - name: Install emmylua_check
+      - name: Install emmylua_check and luacheck
         run: |
           version=0.14.0
           url="https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/${version}/emmylua_check-linux-x64.tar.gz"
           curl -fsSL "$url" | tar -xz -C /usr/local/bin
+          sudo apt-get update && sudo apt-get install -y lua-check
+
+      # Shell: install pinned shfmt plus shellcheck and zsh for prek.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: shfmt@3.11.0
+      - name: Install shellcheck and zsh
+        run: sudo apt-get update && sudo apt-get install -y shellcheck zsh
+
+      # Nix: install Nix and put nixfmt, deadnix and statix on PATH for prek.
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - name: Install Nix lint tools
+        run: |
+          tools=$(nix build --no-link --print-out-paths --inputs-from . nixpkgs#nixfmt nixpkgs#deadnix nixpkgs#statix | sed 's|$|/bin|' | paste -sd: -)
+          echo "$tools" | tr ':' '\n' >> "$GITHUB_PATH"
 
       - run: uvx prek@0.5.11 run --all-files --show-diff-on-failure
 
@@ -56,7 +71,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # Python
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.4.0
       - run: uv run --locked pytest
 
       # Web

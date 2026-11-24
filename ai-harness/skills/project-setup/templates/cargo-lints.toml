@@ -1,4 +1,5 @@
 # Append to Cargo.toml (or place under [workspace.lints.*] in a workspace).
+# Also add `cognitive-complexity-threshold = 15` in a root `clippy.toml`.
 [lints.rust]
 # Avoid unsafe unless a crate explicitly requires FFI or low-level invariants.
 unsafe_code = "forbid"
@@ -6,6 +7,9 @@ unsafe_code = "forbid"
 [lints.clippy]
 # Priority -1 lets individual lint overrides below win over the group level.
 pedantic = { level = "warn", priority = -1 }
+# Clippy's quadratic nesting penalty makes cognitive complexity <= 15
+# (set in clippy.toml) equivalent to Python C901 <= 8 and Go cyclop <= 10.
+cognitive_complexity = "warn"
 # Propagate errors with `?` or handle them explicitly instead of panicking.
 unwrap_used = "deny"
 # Reserve `expect` for invariants that cannot fail, with a short reason.

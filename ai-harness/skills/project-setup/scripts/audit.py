@@ -22,71 +22,46 @@ from typing import Any
 WARNING_LINE_THRESHOLD = 600
 HARD_CAP_LINE_THRESHOLD = 1000
 EXPECTED_MAX_POSITIONAL_ARGS = 2
+EXPECTED_MAX_COMPLEXITY = 8
+EXPECTED_MAX_BRANCHES = 10
+EXPECTED_MAX_NESTED_BLOCKS = 4
+MAX_RULE_PREVIEW = 4
+PARITY_TOOLS = ("shellcheck", "shfmt", "deadnix", "statix", "luacheck")
 
-PRUNE_DIRS = frozenset(
-    [
-        ".git",
-        "node_modules",
-        ".venv",
-        "venv",
-        "target",
-        "dist",
-        "build",
-        "__pycache__",
-        ".mypy_cache",
-        ".pytest_cache",
-        ".ruff_cache",
-        ".rumdl_cache",
-        ".next",
-        ".astro",
-        "vendor",
-    ],
+OXLINT_COMMON_RULES = (
+    frozenset({"complexity", "max-depth", "max-nested-callbacks", "max-params", "curly", "import/no-cycle", "eqeqeq"})
+    | frozenset({"no-var", "prefer-const", "no-param-reassign", "no-nested-ternary", "no-else-return", "no-lonely-if"})
+    | frozenset({"unicorn/no-negated-condition"})
+)
+OXLINT_TS_RULES = (
+    frozenset(
+        {"typescript/consistent-type-assertions", "typescript/no-explicit-any", "typescript/no-non-null-assertion"}
+    )
+    | frozenset({"typescript/switch-exhaustiveness-check", "typescript/no-misused-promises"})
+    | frozenset({"typescript/explicit-function-return-type"})
+)
+GOLANGCI_REQUIRED = frozenset({"cyclop", "gocognit", "nestif", "revive", "gosec"}) | frozenset(
+    {"errcheck", "errorlint", "staticcheck", "gofumpt"}
+)
+EMMY_REQUIRED_ERRORS = (
+    frozenset(
+        {"need-check-nil", "param-type-mismatch", "return-type-mismatch", "unnecessary-if", "assign-type-mismatch"}
+    )
+    | frozenset({"inject-field", "redundant-return-value", "redundant-parameter", "unused", "redefined-local"})
+    | frozenset({"unreachable-code"})
+)
+JSONC_TOKEN_RE = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
+
+PRUNE_DIRS = frozenset({".git", "node_modules", ".venv", "venv", "target", "dist", "build", "vendor"}) | frozenset(
+    {"__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".rumdl_cache", ".next", ".astro"}
 )
 
-SKIP_SIZE_EXTS = frozenset(
-    [
-        ".lock",
-        ".svg",
-        ".json",
-        ".jsonc",
-        ".csv",
-        ".tsv",
-        ".jsonl",
-        ".ndjson",
-        ".sql",
-        ".xml",
-        ".md",
-        ".mdx",
-        ".markdown",
-        ".map",
-        ".snap",
-        ".po",
-        ".pot",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".gif",
-        ".webp",
-        ".ico",
-        ".pdf",
-        ".woff",
-        ".woff2",
-        ".ttf",
-        ".otf",
-        ".eot",
-        ".mp4",
-        ".webm",
-        ".mov",
-        ".zip",
-        ".tar",
-        ".gz",
-        ".wasm",
-        ".pyc",
-        ".so",
-        ".dylib",
-        ".dll",
-        ".exe",
-    ],
+SKIP_SIZE_EXTS = (
+    frozenset({".lock", ".svg", ".json", ".jsonc", ".csv", ".tsv", ".jsonl", ".ndjson", ".sql", ".xml"})
+    | frozenset({".md", ".mdx", ".markdown", ".map", ".snap", ".po", ".pot"})
+    | frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".mp4", ".webm", ".mov"})
+    | frozenset({".woff", ".woff2", ".ttf", ".otf", ".eot"})
+    | frozenset({".zip", ".tar", ".gz", ".wasm", ".pyc", ".so", ".dylib", ".dll", ".exe"})
 )
 
 SKIP_SIZE_RE = re.compile(
@@ -95,28 +70,17 @@ SKIP_SIZE_RE = re.compile(
 
 STACK_EXTS: dict[str, frozenset[str]] = {
     "python": frozenset({".py", ".pyi"}),
-    "web": frozenset(
-        {
-            ".ts",
-            ".tsx",
-            ".mts",
-            ".cts",
-            ".js",
-            ".jsx",
-            ".mjs",
-            ".cjs",
-            ".astro",
-            ".svelte",
-            ".vue",
-            ".css",
-            ".html",
-        }
+    "web": (
+        frozenset({".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"})
+        | frozenset({".astro", ".svelte", ".vue", ".css", ".html"})
     ),
     "markdown": frozenset({".md", ".mdx", ".markdown"}),
     "rust": frozenset({".rs"}),
     "go": frozenset({".go"}),
     "lua": frozenset({".lua"}),
     "notebooks": frozenset({".ipynb"}),
+    "shell": frozenset({".sh", ".bash", ".zsh"}),
+    "nix": frozenset({".nix"}),
 }
 
 TS_EXTS = frozenset({".ts", ".tsx", ".mts", ".cts"})
@@ -134,22 +98,11 @@ WORKFLOW_LEGACY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("mypy", re.compile(r"\bmypy\b")),
     ("pyright", re.compile(r"\bpyright\b")),
     ("biome", re.compile(r"\bbiome\b")),
-    ("luacheck", re.compile(r"\bluacheck\b")),
+    ("selene", re.compile(r"\bselene\b")),
     ("husky", re.compile(r"\bhusky\b")),
 )
 
-NON_CI_WORKFLOW_STEMS = frozenset(
-    {
-        "release",
-        "publish",
-        "deploy",
-        "pages",
-        "docs",
-        "codeql",
-        "stale",
-        "labeler",
-    }
-)
+NON_CI_WORKFLOW_STEMS = frozenset({"release", "publish", "deploy", "pages", "docs", "codeql", "stale", "labeler"})
 
 
 def _read_text(path: Path) -> str | None:
@@ -165,6 +118,18 @@ def _read_json(path: Path) -> dict[str, Any]:
         return {}
     try:
         data = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _read_jsonc(path: Path) -> dict[str, Any]:
+    text = _read_text(path)
+    if text is None:
+        return {}
+    stripped = JSONC_TOKEN_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", text)
+    try:
+        data = json.loads(stripped)
     except json.JSONDecodeError:
         return {}
     return data if isinstance(data, dict) else {}
@@ -291,6 +256,8 @@ def _detect_stacks(root: Path, files: list[str], *, package_json: dict[str, Any]
         "go": (root / "go.mod").is_file(),
         "lua": False,
         "notebooks": False,
+        "shell": False,
+        "nix": (root / "flake.nix").is_file(),
     }
     present = {stack: count for stack, count in counts.items() if count > 0 or markers[stack]}
     return {
@@ -499,33 +466,72 @@ def _inspect_legacy_tooling(
     return findings
 
 
+def _missing_ruff_rules(ruff_cfg: dict[str, Any]) -> list[dict[str, str]]:
+    if not ruff_cfg:
+        return [{"scope": "python", "item": "[tool.ruff]", "detail": "Ruff config in pyproject.toml"}]
+    missing: list[dict[str, str]] = []
+    lint_cfg = _as_dict(ruff_cfg.get("lint"))
+    pylint_cfg = _as_dict(lint_cfg.get("pylint"))
+    mccabe_cfg = _as_dict(lint_cfg.get("mccabe"))
+    checks = (
+        (lint_cfg.get("select") != ["ALL"], "[tool.ruff.lint] select = ['ALL']", "enable Ruff ALL ruleset"),
+        (
+            mccabe_cfg.get("max-complexity") != EXPECTED_MAX_COMPLEXITY,
+            "[tool.ruff.lint.mccabe] max-complexity = 8",
+            "cap cyclomatic complexity via C901",
+        ),
+        (
+            pylint_cfg.get("max-positional-args") != EXPECTED_MAX_POSITIONAL_ARGS,
+            "[tool.ruff.lint.pylint] max-positional-args = 2",
+            "cap positional args via PLR0917",
+        ),
+        (
+            pylint_cfg.get("max-branches") != EXPECTED_MAX_BRANCHES,
+            "[tool.ruff.lint.pylint] max-branches = 10",
+            "cap branches via PLR0912",
+        ),
+        (
+            pylint_cfg.get("max-nested-blocks") != EXPECTED_MAX_NESTED_BLOCKS,
+            "[tool.ruff.lint.pylint] max-nested-blocks = 4",
+            "cap nesting depth via PLR1702",
+        ),
+        (
+            not _as_dict(_as_dict(lint_cfg.get("flake8-tidy-imports")).get("banned-api")),
+            "[tool.ruff.lint.flake8-tidy-imports.banned-api]",
+            "ban cast, unittest and dynamic imports",
+        ),
+    )
+    for is_missing, item, detail in checks:
+        if is_missing:
+            missing.append({"scope": "python", "item": item, "detail": detail})
+    return missing
+
+
 def _missing_python_configs(root: Path, pyproject: dict[str, Any], *, precommit_text: str) -> list[dict[str, str]]:
     missing: list[dict[str, str]] = []
-
-    def need(item: str, detail: str) -> None:
-        missing.append({"scope": "python", "item": item, "detail": detail})
-
     if not (root / "pyproject.toml").is_file():
-        need("pyproject.toml", "uv project metadata and tool settings")
+        missing.append({"scope": "python", "item": "pyproject.toml", "detail": "uv project metadata and tool settings"})
     if not (root / "uv.lock").is_file():
-        need("uv.lock", "committed uv lockfile")
-
-    ruff_cfg = _as_dict(_as_dict(pyproject.get("tool")).get("ruff"))
-    if not ruff_cfg:
-        need("[tool.ruff]", "Ruff config in pyproject.toml")
-    else:
-        lint_cfg = _as_dict(ruff_cfg.get("lint"))
-        if lint_cfg.get("select") != ["ALL"]:
-            need("[tool.ruff.lint] select = ['ALL']", "enable Ruff ALL ruleset")
-        if _as_dict(lint_cfg.get("pylint")).get("max-positional-args") != EXPECTED_MAX_POSITIONAL_ARGS:
-            need("[tool.ruff.lint.pylint] max-positional-args = 2", "cap positional args via PLR0917")
-        tidy_cfg = _as_dict(lint_cfg.get("flake8-tidy-imports"))
-        if not _as_dict(tidy_cfg.get("banned-api")):
-            need("[tool.ruff.lint.flake8-tidy-imports.banned-api]", "ban cast, unittest and dynamic imports")
-
+        missing.append({"scope": "python", "item": "uv.lock", "detail": "committed uv lockfile"})
+    missing.extend(_missing_ruff_rules(_as_dict(_as_dict(pyproject.get("tool")).get("ruff"))))
     if "ty" not in _collect_python_deps(root, pyproject) and "ty-pre-commit" not in precommit_text:
-        need("ty", "add ty to dev deps and .pre-commit-config.yaml")
+        missing.append({"scope": "python", "item": "ty", "detail": "add ty to dev deps and .pre-commit-config.yaml"})
     return missing
+
+
+def _missing_oxlint_rules(root: Path, *, has_typescript: bool) -> list[dict[str, str]]:
+    cfg = _read_jsonc(root / ".oxlintrc.json")
+    if not cfg:
+        return []
+    rules = _as_dict(cfg.get("rules"))
+    required = OXLINT_COMMON_RULES | (OXLINT_TS_RULES if has_typescript else frozenset())
+    absent = sorted(rule for rule in required if rule not in rules)
+    if not absent:
+        return []
+    preview = ", ".join(absent[:MAX_RULE_PREVIEW]) + (
+        f" (+{len(absent) - MAX_RULE_PREVIEW} more)" if len(absent) > MAX_RULE_PREVIEW else ""
+    )
+    return [{"scope": "web", "item": ".oxlintrc.json parity rules", "detail": f"missing: {preview}"}]
 
 
 def _missing_web_configs(root: Path, stacks: dict[str, Any], *, package_json: dict[str, Any]) -> list[dict[str, str]]:
@@ -550,25 +556,90 @@ def _missing_web_configs(root: Path, stacks: dict[str, Any], *, package_json: di
             need(f"{dep} devDependency", detail)
     if stacks["has_typescript"] and "oxlint-tsgolint" not in node_deps:
         need("oxlint-tsgolint devDependency", "type-aware oxlint checks replacing tsc")
+    if (root / ".oxlintrc.json").is_file():
+        missing.extend(_missing_oxlint_rules(root, has_typescript=stacks["has_typescript"]))
     return missing
 
 
-def _missing_systems_configs(root: Path, present: dict[str, int]) -> list[dict[str, str]]:
+def _missing_rust_configs(root: Path) -> list[dict[str, str]]:
+    missing: list[dict[str, str]] = []
+    cargo = _read_toml(root / "Cargo.toml")
+    clippy_cfg = _as_dict(_as_dict(cargo.get("lints")).get("clippy")) or _as_dict(
+        _as_dict(_as_dict(cargo.get("workspace")).get("lints")).get("clippy")
+    )
+    if not clippy_cfg:
+        missing.append({"scope": "rust", "item": "[lints.clippy]", "detail": "clippy lints in Cargo.toml"})
+    elif "cognitive_complexity" not in clippy_cfg:
+        missing.append(
+            {"scope": "rust", "item": "clippy cognitive_complexity", "detail": "add cognitive_complexity = 'warn'"}
+        )
+    if not ((root / "clippy.toml").is_file() or (root / ".clippy.toml").is_file()):
+        missing.append({"scope": "rust", "item": "clippy.toml", "detail": "set cognitive-complexity-threshold = 15"})
+    return missing
+
+
+def _missing_go_configs(root: Path) -> list[dict[str, str]]:
+    cfg_path = next((root / name for name in (".golangci.yml", ".golangci.yaml") if (root / name).is_file()), None)
+    if cfg_path is None:
+        return [{"scope": "go", "item": ".golangci.yml", "detail": "golangci-lint v2 config"}]
+    text = _read_text(cfg_path) or ""
+    absent = sorted(name for name in GOLANGCI_REQUIRED if not re.search(rf"\b{re.escape(name)}\b", text))
+    if not absent:
+        return []
+    return [{"scope": "go", "item": ".golangci.yml parity linters", "detail": f"missing: {', '.join(absent)}"}]
+
+
+def _missing_lua_configs(root: Path, *, precommit_text: str) -> list[dict[str, str]]:
+    missing: list[dict[str, str]] = []
+    if not ((root / "stylua.toml").is_file() or (root / ".stylua.toml").is_file()):
+        missing.append({"scope": "lua", "item": "stylua.toml", "detail": "StyLua formatting config"})
+    emmy_path = root / ".emmyrc.json"
+    if not emmy_path.is_file():
+        missing.append({"scope": "lua", "item": ".emmyrc.json", "detail": "emmylua_check config"})
+    else:
+        severity = _as_dict(_as_dict(_read_jsonc(emmy_path).get("diagnostics")).get("severity"))
+        absent = sorted(rule for rule in EMMY_REQUIRED_ERRORS if severity.get(rule) != "error")
+        if absent:
+            preview = ", ".join(absent[:MAX_RULE_PREVIEW])
+            missing.append({"scope": "lua", "item": ".emmyrc.json severity", "detail": f"not error: {preview}"})
+    if precommit_text and "luacheck" not in precommit_text:
+        missing.append(
+            {
+                "scope": "lua",
+                "item": "luacheck complexity hook",
+                "detail": "luacheck --only 561 --max-cyclomatic-complexity 10",
+            }
+        )
+    return missing
+
+
+def _missing_shell_nix_configs(present: dict[str, int], *, precommit_text: str) -> list[dict[str, str]]:
+    if not precommit_text:
+        return []
+    missing: list[dict[str, str]] = []
+    checks: tuple[tuple[str, str, str, str], ...] = (
+        ("shell", "shfmt", "shfmt hook", "format sh/bash scripts with shfmt -i 2"),
+        ("shell", "shellcheck", "shellcheck hook", "lint sh/bash scripts with shellcheck"),
+        ("shell", "zsh -n", "zsh syntax hook", "check zsh scripts with zsh -n"),
+        ("nix", "nixfmt", "nixfmt hook", "format Nix files with nixfmt"),
+        ("nix", "deadnix", "deadnix hook", "catch unused Nix bindings with deadnix --fail"),
+        ("nix", "statix", "statix hook", "catch Nix anti-patterns with statix check"),
+    )
+    for stack, needle, item, detail in checks:
+        if stack in present and needle not in precommit_text:
+            missing.append({"scope": stack, "item": item, "detail": detail})
+    return missing
+
+
+def _missing_systems_configs(root: Path, present: dict[str, int], *, precommit_text: str) -> list[dict[str, str]]:
     missing: list[dict[str, str]] = []
     if "rust" in present:
-        cargo = _read_toml(root / "Cargo.toml")
-        has_clippy = "clippy" in _as_dict(cargo.get("lints")) or "clippy" in _as_dict(
-            _as_dict(cargo.get("workspace")).get("lints"),
-        )
-        if not has_clippy:
-            missing.append({"scope": "rust", "item": "[lints.clippy]", "detail": "clippy lints in Cargo.toml"})
-    if "go" in present and not ((root / ".golangci.yml").is_file() or (root / ".golangci.yaml").is_file()):
-        missing.append({"scope": "go", "item": ".golangci.yml", "detail": "golangci-lint v2 config"})
+        missing.extend(_missing_rust_configs(root))
+    if "go" in present:
+        missing.extend(_missing_go_configs(root))
     if "lua" in present:
-        if not ((root / "stylua.toml").is_file() or (root / ".stylua.toml").is_file()):
-            missing.append({"scope": "lua", "item": "stylua.toml", "detail": "StyLua formatting config"})
-        if not (root / ".emmyrc.json").is_file():
-            missing.append({"scope": "lua", "item": ".emmyrc.json", "detail": "emmylua_check config"})
+        missing.extend(_missing_lua_configs(root, precommit_text=precommit_text))
+    missing.extend(_missing_shell_nix_configs(present, precommit_text=precommit_text))
     return missing
 
 
@@ -607,7 +678,7 @@ def _inspect_missing_configs(
         missing.extend(_missing_python_configs(root, pyproject, precommit_text=precommit_text))
     if "web" in present:
         missing.extend(_missing_web_configs(root, stacks, package_json=package_json))
-    missing.extend(_missing_systems_configs(root, present))
+    missing.extend(_missing_systems_configs(root, present, precommit_text=precommit_text))
     return missing
 
 
@@ -760,6 +831,7 @@ def audit_repository(root: Path) -> dict[str, Any]:
             package_json=package_json,
         ),
         "byor": _inspect_byor(resolved, stacks),
+        "tools": {tool: shutil.which(tool) is not None for tool in PARITY_TOOLS},
         "file_sizes": _inspect_file_sizes(resolved, files),
         "git_hygiene": _inspect_git_hygiene(resolved),
     }
@@ -853,6 +925,18 @@ def format_markdown(report: dict[str, Any]) -> str:
             f"| Needs `ast-grep` prek hook | {'yes' if byor['needs_ast_grep_hook'] else 'no'} |",
             "",
             *_format_sizes_section(report["file_sizes"]),
+        ]
+    )
+
+    tools = report["tools"]
+    lines.extend(
+        [
+            "",
+            "## Local tools",
+            "",
+            "| Tool | Available |",
+            "| --- | --- |",
+            *(f"| `{name}` | {'yes' if available else 'no'} |" for name, available in tools.items()),
         ]
     )
 

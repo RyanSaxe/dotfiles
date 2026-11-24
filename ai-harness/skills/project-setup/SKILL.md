@@ -1,12 +1,13 @@
 ---
 name: project-setup
-description: Use when the user starts a new repository or asks to clean up or bring an existing one in line with their setup across Python, Web/TypeScript/React, Markdown, Rust, Go and Lua, such as moving off Prettier, ESLint, Black, Flake8, mypy or markdownlint. Sets up toolchains, prek hooks, one CI workflow, BYOR packages, README and AGENTS.md, and runs a zero-ratchet cleanup audit and single PR for existing repositories.
+description: Use when the user starts a new repository or asks to clean up or bring an existing one in line with their setup across Python, Web/TypeScript/React, Markdown, Rust, Go, Lua, Notebooks, Shell and Nix, such as moving off Prettier, ESLint, Black, Flake8, mypy or markdownlint. Sets up toolchains, prek hooks, one CI workflow, BYOR packages, README and AGENTS.md, and runs a zero-ratchet cleanup audit and single PR for existing repositories.
 ---
 
 # Project setup
 
-This skill sets up a repository the way the user works across Python,
-Web/TypeScript/React, Markdown, Rust, Go and Lua. It has two modes:
+This skill sets up a repository the way the user works across nine stacks:
+Python, Web/TypeScript/React, Markdown, Rust, Go, Lua, Notebooks, Shell and
+Nix. It has two modes:
 
 - **New project:** ask the questions below, write the files, run the checks and
   open a pull request.
@@ -21,7 +22,7 @@ already answers:
 
 1. Is the repository public or private, and which license does it use?
 2. What is it: a Python package or app, a web site, a Node CLI, a Rust crate, a
-   Go module, a Lua project, notebooks, or a mix?
+   Go module, a Lua project, notebooks, shell scripts, a Nix flake, or a mix?
 3. Does it ship to other people's machines? If it does, which operating systems
    and language versions does CI test, and does a merge release it or does a
    person?
@@ -75,6 +76,43 @@ or fight each other:
   (`python` or `web`). The old `style` package is retired; replace it with
   `craft` plus the stack package.
 
+## Cross-language parity standard
+
+Every stack enforces the same eight hygiene dimensions through its native
+tooling so quality does not drop when switching languages:
+
+- **Complexity:** small, flat functions calibrated per language's metric.
+- **Nesting depth:** capped at 4 levels (`PLR1702`, `max-depth`, `nestif`,
+  Clippy's quadratic cognitive penalty).
+- **Parameter cap:** short positional signatures (`PLR0917 <= 2` in Python,
+  `max-params <= 3` in JS/TS, `revive` `argument-limit: 5` in Go).
+- **Strict types:** `ty`, `oxlint-tsgolint` (`"strict": true`), `rustc`,
+  `go`/`staticcheck`, strict `emmylua_check`.
+- **Control-flow hygiene:** no shadowed bindings, redundant branches, implicit
+  coercion, or swallowed errors.
+- **Dead code:** unused bindings, unreachable code, and unused Nix inputs
+  (`deadnix --fail`).
+- **Formatting:** one canonical formatter per stack, auto-fixing in hooks.
+- **Lockfiles:** committed and verified in hooks (`uv.lock`,
+  `package-lock.json`, `Cargo.lock`, `go.sum`, `flake.lock`).
+
+### Complexity equivalence across languages
+
+Raw thresholds differ because each analyzer counts different constructs:
+
+- **Python (`C901 <= 8`, `PLR0912 <= 10`, `PLR1702 <= 4`):** 6 is the
+  human-ideal ceiling and >10 is poor; 8 is the agent-assisted benchmark.
+  Ruff's `C901` ignores boolean `and`/`or`.
+- **JS/TS (`complexity <= 10`, `max-depth <= 4`, `max-nested-callbacks <= 3`):**
+  `oxlint` counts `&&`, `||`, `??` and `?:`, so 10 matches Python's 8.
+- **Go (`cyclop <= 10`, `gocognit <= 15`, `nestif <= 4`):** accounts for
+  idiomatic `if err != nil` branches alongside cognitive complexity.
+- **Rust (`clippy::cognitive_complexity <= 15` via `clippy.toml`):** quadratic
+  nesting penalty makes 15 equivalent to ~8-10 cyclomatic complexity.
+- **Lua (`luacheck --no-config --only 561 --max-cyclomatic-complexity 10`):**
+  runs in ~0.23s for complexity alone and pairs with strict `emmylua_check`;
+  skip `selene` and full `luacheck` static analysis.
+
 ## Python
 
 Run Python through uv only, with `uv run`, `uv add` and `uv sync`, never
@@ -90,11 +128,11 @@ For a package or an app:
 2. Run `uv add --dev pytest ruff ty`, and add `tests/`. Commit `uv.lock`;
    `uv-lock-check` keeps it in sync with `pyproject.toml`.
 3. Append `templates/pyproject.toml` to `pyproject.toml`. It sets Ruff's line
-   length to 120, enables `select = ["ALL"]`, caps positional parameters at two
-   (`PLR0917` via `max-positional-args = 2`), bans relative imports, and bans
-   `typing.cast`, `typing_extensions.cast`, `unittest`, `unittest.mock` and
-   dynamic `importlib` APIs via `TID251`. Give each ignore you add a comment of
-   its own.
+   length to 120, enables `select = ["ALL"]`, sets `C901 <= 8`, `PLR0912 <= 10`,
+   `PLR1702 <= 4`, caps positional parameters at two (`PLR0917` via
+   `max-positional-args = 2`), bans relative imports, and bans `typing.cast`,
+   `typing_extensions.cast`, `unittest`, `unittest.mock` and dynamic `importlib`
+   APIs via `TID251`. Give each ignore you add a comment of its own.
 4. Run `byor init --packages craft python --no-gate`.
 
 Ruff formats and lints with `--fix`, and `ty` checks types. A project needs no
@@ -110,11 +148,17 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 - `oxfmt` formats and `oxlint` lints, replacing Prettier and ESLint. Install
   them with `npm install --save-dev --save-exact oxfmt oxlint`. `.oxfmtrc.json`
   keeps `oxfmt` off Markdown, which `rumdl` formats.
-- `.oxlintrc.json` enables `typescript`, `react`, `jsx-a11y`, `unicorn` and
-  `oxc`, sets `correctness`, `suspicious` and `perf` to `"error"`, and enforces
-  `max-params` (3), no `as` assertions, no `any`, no `!` non-null assertions and
-  exhaustive `switch` checks. Drop `react` and `jsx-a11y` for pure Node CLIs and
-  libraries.
+- `.oxlintrc.json` enables `typescript`, `unicorn`, `oxc` and `import` (add
+  `react` and `jsx-a11y` for React repos; drop `typescript` and its rules for
+  pure JS), sets `correctness`, `suspicious` and `perf` to `"error"`, and
+  enforces `complexity` (10), `max-depth` (4), `max-nested-callbacks` (3),
+  `max-params` (3), `curly`, `import/no-cycle`, `eqeqeq`, `no-var`,
+  `prefer-const`, `no-param-reassign`, `no-nested-ternary`, `no-else-return`,
+  `no-lonely-if`, `unicorn/no-negated-condition`, no `as` assertions, no `any`,
+  no `!` non-null assertions, exhaustive `switch` checks,
+  `typescript/no-misused-promises` and
+  `typescript/explicit-function-return-type`. CLI entrypoints may opt out of
+  `no-console`.
 - For TypeScript projects (`"strict": true`), install `oxlint-tsgolint` with
   `--save-dev --save-exact` and add `--type-aware --type-check` to the `oxlint`
   hook so `oxlint` checks types in place of a separate `tsc` hook. A framework
@@ -136,7 +180,8 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
   and `cargo metadata --locked --format-version 1` verifies `Cargo.lock`.
 - Append `templates/cargo-lints.toml` to `Cargo.toml` (or place it under
   `[workspace.lints.*]` in a workspace) to forbid `unsafe_code`, warn on
-  `clippy::pedantic`, deny `unwrap_used` and warn on `expect_used`.
+  `clippy::pedantic` and `cognitive_complexity`, deny `unwrap_used` and warn on
+  `expect_used`. Add `cognitive-complexity-threshold = 15` in `clippy.toml`.
 - Run `cargo test --locked` in CI. For shipped crates, consider adding
   `cargo machete` or `cargo deny check` to the CI `test` job.
 - Run `byor init --package craft --no-gate`.
@@ -144,8 +189,11 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 ## Go
 
 - Copy `templates/golangci.yml` to `.golangci.yml`. It uses `golangci-lint` v2
-  with `gofumpt` and `goimports` under `formatters` and `standard` plus
-  `staticcheck`, `errcheck`, `errorlint`, `gosec` and `revive` under `linters`.
+  with `gofumpt` and `goimports` under `formatters`, `standard` plus `cyclop`
+  (10), `gocognit` (15), `nestif` (4), `revive` (`argument-limit: 5`), `gosec`,
+  `errcheck`, `errorlint` and `staticcheck` under `linters`, and uncapped issue
+  reporting (`max-issues-per-linter: 0`, `max-same-issues: 0`,
+  `uniq-by-line: false`).
 - prek runs `golangci-lint fmt`, `golangci-lint run` and `go mod tidy -diff`. CI
   installs `golangci-lint` with `install-only: true` so prek runs it once, and
   runs `go test -race ./...`.
@@ -157,10 +205,29 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 
 - Copy `templates/stylua.toml` to `stylua.toml` and `templates/emmyrc.json` to
   `.emmyrc.json` (switching `runtime.version` to `"Lua5.4"` for standalone Lua,
-  or adding host globals like `"vim"` for Neovim).
-- prek runs `stylua` and `emmylua_check .`. Add `busted` or
+  or adding host globals like `"vim"` for Neovim). `.emmyrc.json` promotes the
+  local type, nil-check, control-flow and dead-code diagnostics to `"error"`.
+- prek runs `stylua`, `emmylua_check .` and
+  `luacheck --no-config --only 561 --max-cyclomatic-complexity 10` (complexity
+  only; skip `selene` and full `luacheck` static analysis). Add `busted` or
   `nvim --clean --headless` test commands to the CI `test` job when tests exist.
 - Run `byor init --package craft --no-gate`.
+
+## Shell
+
+- `shfmt --write --indent 2` formats POSIX sh, bash and dash scripts (excluding
+  `*.zsh`, since `shfmt` has no zsh dialect).
+- `shellcheck` lints every sh, bash and dash script; `zsh -n` checks syntax on
+  `*.zsh` files and scripts with a `zsh` shebang.
+- Give every executable or checked shell script an explicit shebang so tools
+  know its dialect without guessing.
+
+## Nix
+
+- `nixfmt` formats every `.nix` file.
+- `deadnix --fail` catches unused bindings and arguments.
+- `statix check` catches Nix anti-patterns and repeated attribute keys.
+- Keep `flake.lock` committed and run `nix build` / `nix eval` checks in CI.
 
 ## Every project
 
@@ -285,8 +352,9 @@ Use this mode for any existing repository.
    1. **Migrate tooling and wire BYOR:** convert and delete legacy tooling
       configs, dependencies and hooks (Prettier, ESLint, Husky, lint-staged,
       Biome, markdownlint, Black, isort, Flake8, pylint, mypy, pyright,
-      luacheck, Python `pre-commit`, Dependabot/Renovate). Install the canonical
-      tools and wire BYOR with `--no-gate` and `craft` plus the stack packages.
+      `.luacheckrc` / `selene`, Python `pre-commit`, Dependabot/Renovate).
+      Install the canonical tools and wire BYOR with `--no-gate` and `craft`
+      plus the stack packages.
    2. **Pure reformat:** run only the formatters (`prek run` formatter hooks or
       the formatters directly) with no logic edits. When the repository
       preserves commit history, record this commit's SHA in

@@ -38,3 +38,11 @@ max_line_length = 100
 [*.lua]
 indent_size = 2
 max_line_length = 120
+
+# Shell: shfmt -i 2
+[*.{sh,bash,zsh}]
+indent_size = 2
+
+# Nix: nixfmt
+[*.nix]
+indent_size = 2
