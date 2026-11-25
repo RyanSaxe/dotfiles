@@ -144,8 +144,8 @@ repos:
         pass_filenames: false
 
       - id: prompt
-        name: pytest (prompt and theme)
+        name: pytest (prompt, theme, and pushover)
         entry: uv run --no-project --with pytest pytest -q tests/zsh
         language: system
-        files: ^(config/zsh/prompt-segments\.sh|theme/theme\.sh|tests/zsh/)
+        files: ^(config/zsh/prompt-segments\.sh|theme/theme\.sh|ai-harness/tools/notify-pushover\.zsh|tests/zsh/)
         pass_filenames: false
