@@ -1,0 +1,11 @@
+version: 1
+project:
+  name: dotfiles
+paths:
+  sgconfig: sgconfig.yml
+  project_rules: .byor/rules/project
+  personal_local_rules: .byor/rules/personal/local
+  personal_global_rules: .byor/rules/personal/global
+  personal_packages_rules: .byor/rules/personal/packages
+  command_rules: .byor/commands
+checks: []

@@ -1,6 +1,5 @@
-# Values here mirror the formatters pinned in .pre-commit-config.yaml so that
-# editors and the pre-commit hook never disagree. Changing one means changing both.
-
+# Editors read this file. Its settings mirror the formatters' own config
+# files, so a change to one needs the same change to the other.
 root = true
 
 [*]
@@ -11,23 +10,38 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-# ruff: 4-space indent, 88-column lines
+# Python: ruff, in ruff.toml
 [*.py]
 indent_size = 4
-max_line_length = 88
-
-# stylua
-[*.lua]
 max_line_length = 120
 
-# shfmt -i 2
-[*.{sh,zsh}]
-indent_size = 2
-
-# oxfmt, and rumdl's default line length for Markdown
-[*.{html,css,js,ts,json,yaml,yml,md}]
+# Web, JSON, YAML and TOML: oxfmt
+[*.{css,html,js,cjs,mjs,jsx,ts,cts,mts,tsx,json,yaml,yml,toml}]
 max_line_length = 80
 
-# Makefile syntax requires literal tabs
+# Markdown: rumdl, in .rumdl.toml
+[*.md]
+max_line_length = 80
+
+# Go: gofumpt and gofmt, in pkgs/ws/.golangci.yml
+[*.go]
+indent_style = tab
+indent_size = 4
+max_line_length = 100
+
+# Lua: stylua, in stylua.toml
+[*.lua]
+indent_size = 2
+max_line_length = 120
+
+# Shell: shfmt -i 2
+[*.{sh,bash,zsh}]
+indent_size = 2
+
+# Nix: nixfmt
+[*.nix]
+indent_size = 2
+
+# Makefile syntax requires literal tabs.
 [Makefile]
 indent_style = tab

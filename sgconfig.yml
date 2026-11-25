@@ -1,0 +1,5 @@
+ruleDirs:
+  - .byor/rules/project
+  - .byor/rules/personal/local
+  - .byor/rules/personal/global
+  - .byor/rules/personal/packages
