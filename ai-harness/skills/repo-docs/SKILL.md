@@ -1,67 +1,62 @@
 ---
 name: repo-docs
-description: Use when writing, reorganizing or auditing a repository's README.md, docs/ tree, architecture documentation or GitHub Markdown diagrams. Covers README structure, Diátaxis layout, solution-focused architecture docs and light/dark SVG diagrams. Pair with write-well for general prose craft.
+description: Use when writing, reorganizing or auditing a repository's README.md, docs/ tree, architecture documentation or GitHub Markdown diagrams. Covers README structure, Diátaxis layout, solution-focused architecture docs and light/dark SVG diagrams. Pair with write-well for writing and revising prose.
 ---
 
 # Repository documentation
 
-Write documentation for a reader who was not part of the work. Keep it concise,
-scannable and verified against the code. Pair this skill with `write-well` when
-drafting or revising prose.
+Write documentation for a reader who was not part of the work. Keep it short,
+easy to scan and accurate against the code. Pair this skill with `write-well`
+when writing or revising prose.
 
 ## READMEs
 
-A README introduces the project and earns the reader's interest in about one
-screen:
+A README is the front door to the repository:
 
-1. **Opening pitch:** one or two sharp sentences that say what the project does
-   and why it is worth using.
-2. **Visual or high-level diagram:** a screenshot, recording or architecture
-   diagram that shows the shape of the system at a glance.
-3. **Fast quick start:** the minimal real commands or code to try it.
-4. **Links into `docs/`:** a short table or list pointing to deeper pages
-   instead of duplicating manuals in the README.
+1. **What it is:** one or two plain sentences saying what the project does and
+   why it exists.
+2. **Overview visual:** a screenshot, recording or architecture diagram showing
+   how it fits together.
+3. **Quick start:** the minimal commands or code to try it.
+4. **Links to `docs/`:** a short index pointing to deeper pages instead of
+   duplicating them here.
 
-Keep a root `LICENSE` file so GitHub surfaces the license in the repository
-sidebar rather than adding a redundant `## License` stub to the README. Keep
-special legal notices in the README only when required, such as a Fan Content
-Policy.
-
-Keep prose tight: never a dry stub and never a bloated wall of text. Leave out
-status banners, roadmap promises and features that do not exist yet.
+Keep a root `LICENSE` file (GitHub shows it in the sidebar) and skip a redundant
+`## License` section unless a special notice, such as a Fan Content Policy, is
+required. Leave out status banners, roadmap promises and features that do not
+exist yet.
 
 ## Repository structure (Diátaxis)
 
 For a repository with more than one documentation page, separate pages by what
 the reader is trying to do, with `docs/README.md` as the index:
 
-| Directory               | Role      | Style                                                      |
-| ----------------------- | --------- | ---------------------------------------------------------- |
-| `docs/getting-started/` | Tutorials | Crisp first-run steps to a working result                  |
-| `docs/guides/`          | How-to    | Lean task recipes without background theory                |
-| `docs/concepts/`        | Concepts  | Focused architecture and design prose, still free of fluff |
-| `docs/reference/`       | Reference | Terse lookup tables, flags, schemas and defaults           |
+| Directory               | Role      | Contents                                       |
+| ----------------------- | --------- | ---------------------------------------------- |
+| `docs/getting-started/` | Tutorials | First-run steps to a working result            |
+| `docs/guides/`          | How-to    | Task-focused recipes without background theory |
+| `docs/concepts/`        | Concepts  | Architecture and design explanations           |
+| `docs/reference/`       | Reference | Lookup tables, flags, schemas and defaults     |
 
 Add `docs/contributing/` only when contributor workflow needs more than
-`AGENTS.md`. Skip any directory the project does not yet need instead of adding
+`AGENTS.md`. Skip any directory the project does not need yet instead of adding
 empty stubs.
 
-`docs/concepts/architecture.md` explains the architecture of the solution, never
-a folder, file or module inventory. Focus on the core problem, the design
-thesis, how data and control flow across major components and *why* the
-architectural seams and invariants exist. Put directory maps, module inventories
-and CLI flag tables in `docs/reference/` or `docs/contributing/`.
+`docs/concepts/architecture.md` explains the architecture of the solution, not a
+folder, file or module inventory. Cover the problem being solved, the main
+design choices, how data and control move across major components and why the
+boundaries and invariants exist. Put directory maps, module lists and CLI flag
+tables in `docs/reference/` or `docs/contributing/`.
 
-Never announce a repository's lint rules, import-boundary rules or static-check
-catalogs anywhere in `docs/` (including `docs/contributing/`). CI and config
-files are the source of truth for contributors.
+Never list a repository's lint rules, import-boundary rules or static-check
+catalogs in `docs/` (including `docs/contributing/`). CI and config files are
+the source of truth for contributors.
 
 ## Diagrams in GitHub Markdown
 
-Prefer committed light and dark SVG files inside a `<picture>` element over
-fenced `mermaid` blocks. GitHub's native iOS and Android apps render Mermaid as
-raw code, whereas `<picture>` SVGs render crisply everywhere in both light and
-dark modes.
+Use committed light and dark SVG files inside a `<picture>` element instead of
+fenced `mermaid` blocks. GitHub's iOS and Android apps show Mermaid as raw code,
+while `<picture>` SVGs render everywhere in both light and dark modes.
 
 ```html
 <picture>
@@ -70,27 +65,26 @@ dark modes.
 </picture>
 ```
 
-Keep diagrams selective. Add one only where visual structure beats prose:
+Add a diagram only when visual layout explains a relationship better than prose:
 
 - **Typography:** use the system font stack
   (`-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif`) at
-  readable sizes (`13px`–`16px` in an ~`600`–`840`-unit `viewBox`).
+  readable sizes (`13px`–`16px` in a `600`–`840`-unit `viewBox`).
 - **Accessibility:** set `role="img"` and an `aria-label` on `<svg>` that
-  matches the `<img alt>` description.
-- **Palette:** match GitHub's light and dark surfaces so both files sit
-  naturally on the page:
+  matches the `<img alt>` text.
+- **Palette:** match GitHub's light and dark backgrounds:
   - Light: ink `#1f2328`, muted `#59636e`, box `#ffffff` / stroke `#b8bec6`,
     accent `#eef2fd` / stroke `#3a5bd9`.
   - Dark: ink `#e6edf3`, muted `#9198a1`, box `#0d1117` / stroke `#3d444d`,
     accent `#152042` / stroke `#6e8cf0`.
-- **Visual verification:** render both `-light.svg` and `-dark.svg` to PNG on
-  light (`#ffffff`) and dark (`#0d1117`) backgrounds and visually inspect the
-  images before finishing. Confirm zero text clipping, zero overlapping labels
-  or arrows, and clear contrast in both themes.
+- **Visual check:** render both `-light.svg` and `-dark.svg` to PNG on light
+  (`#ffffff`) and dark (`#0d1117`) backgrounds and inspect the images before
+  finishing. Check for clipped text, overlapping labels or arrows, and low
+  contrast in both modes.
 
 ## Check before finishing
 
-- Verify every command, flag, path and default against the source.
+- Check every command, flag, path and default against the source.
 - Check that every internal link, anchor and image path resolves.
-- Re-read as a newcomer and cut any sentence that announces, praises or repeats
-  a nearby heading, table or example.
+- Re-read as a newcomer and cut any sentence that merely repeats a nearby
+  heading, table or example.
