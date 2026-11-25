@@ -17,7 +17,7 @@ sync_dir() {
     *.pre-nix) continue ;;
     esac
     [ -f "$skill/SKILL.md" ] || continue
-    [ -e "$to/$name" ] || [ -L "$to/$name" ] || ln -s "$from/$name" "$to/$name"
+    [ -e "$to/$name" ] || [ -L "$to/$name" ] || ln -sn "$from/$name" "$to/$name" 2>/dev/null || [ -e "$to/$name" ] || [ -L "$to/$name" ]
   done
 
   for link in "$to"/*; do
