@@ -6,8 +6,8 @@ description: Use when the user starts a new repository or asks to clean up or br
 # Project setup
 
 This skill sets up a repository the way the user works across nine stacks:
-Python, Web/TypeScript/React, Markdown, Rust, Go, Lua, Notebooks, Shell and
-Nix. It has two modes:
+Python, Web/TypeScript/React, Markdown, Rust, Go, Lua, Notebooks, Shell and Nix.
+It has two modes:
 
 - **New project:** ask the questions below, write the files, run the checks and
   open a pull request.
@@ -103,8 +103,8 @@ tooling so quality does not drop when switching languages:
 Raw thresholds differ because each analyzer counts different constructs:
 
 - **Python (`C901 <= 8`, `PLR0912 <= 10`, `PLR1702 <= 4`):** 6 is the
-  human-ideal ceiling and >10 is poor; 8 is the agent-assisted benchmark.
-  Ruff's `C901` ignores boolean `and`/`or`.
+  human-ideal ceiling and >10 is poor; 8 is the agent-assisted benchmark. Ruff's
+  `C901` ignores boolean `and`/`or`.
 - **JS/TS (`complexity <= 10`, `max-depth <= 4`, `max-nested-callbacks <= 3`):**
   `oxlint` counts `&&`, `||`, `??` and `?:`, so 10 matches Python's 8.
 - **Go (`cyclop <= 10`, `gocognit <= 15`, `nestif <= 4`):** accounts for
@@ -135,7 +135,8 @@ For a package or an app:
    `max-positional-args = 2`), bans relative imports, and bans `typing.cast`,
    `typing_extensions.cast`, `unittest`, `unittest.mock` and dynamic `importlib`
    APIs via `TID251`. Give each ignore you add a comment of its own.
-4. Run `byor init --no-gate --non-interactive --no-register --packages craft python`.
+4. Run
+   `byor init --no-gate --non-interactive --no-register --packages craft python`.
 
 Ruff formats and lints with `--fix`, and `ty` checks types. When a project uses
 optional uv dependency groups (`--group ...`) or lives in a subdirectory
@@ -166,13 +167,13 @@ Ruff and `ty` check them too.
   `typescript/explicit-function-return-type`. CLI entrypoints may opt out of
   `no-console`.
 - For React repos, enable the `"react"` and `"jsx-a11y"` plugins in
-  `.oxlintrc.json` and keep its `no-restricted-imports` rule banning
-  `useEffect` and `useLayoutEffect` from `"react"`, paired with an `overrides`
-  block that allows them only under `**/hooks/**` (or the repo's designated
-  primitive layer). Drop that rule and override in non-React repos. BYOR's
-  `web` package reinforces this in the edit loop by flagging direct
-  `useEffect` / `useLayoutEffect` calls outside `hooks/` and banning
-  `queueMicrotask` / `startTransition` wrappers inside effects everywhere.
+  `.oxlintrc.json` and keep its `no-restricted-imports` rule banning `useEffect`
+  and `useLayoutEffect` from `"react"`, paired with an `overrides` block that
+  allows them only under `**/hooks/**` (or the repo's designated primitive
+  layer). Drop that rule and override in non-React repos. BYOR's `web` package
+  reinforces this in the edit loop by flagging direct `useEffect` /
+  `useLayoutEffect` calls outside `hooks/` and banning `queueMicrotask` /
+  `startTransition` wrappers inside effects everywhere.
 - For TypeScript projects (`"strict": true`), install `oxlint-tsgolint` with
   `--save-dev --save-exact` and add `--type-aware --type-check` to the `oxlint`
   hook so `oxlint` checks types in place of a separate `tsc` hook. A framework
@@ -186,7 +187,8 @@ Ruff and `ty` check them too.
 - A framework's file type, such as `.astro`, goes in the `files` pattern of each
   web hook. `oxfmt` skips the type unless `.oxfmtrc.json` turns it on, as
   `"astro": true` does.
-- Run `byor init --no-gate --non-interactive --no-register --packages craft web`.
+- Run
+  `byor init --no-gate --non-interactive --no-register --packages craft web`.
 
 ## Rust
 
@@ -290,23 +292,27 @@ Ruff and `ty` check them too.
 
 Follow the `repo-docs` and `write-well` skills when writing or revising docs:
 
-- **README:** introduce the project in about one screen: what it does and why
-  it exists, an overview visual or diagram, a minimal quick start and links to
+- **README:** introduce the project in about one screen: what it does and why it
+  exists, an overview visual or diagram, a minimal quick start and links to
   `docs/`. Keep a root `LICENSE` file instead of a redundant `## License`
   section in the README. A feature gets no section of its own.
   [pair's README](https://github.com/RyanSaxe/pair#readme) follows this layout.
+
 - **Diagrams:** commit `-light.svg` and `-dark.svg` pairs inside `<picture>`
   instead of fenced `mermaid` blocks, which GitHub's mobile apps show as raw
   code. Add a diagram only where it helps, use the system font stack with
   `role="img"` and `aria-label`, and inspect rendered PNGs in both light and
   dark modes.
+
 - **No qualifiers or filler:** no list of platforms when every platform works,
   no status banners, and no features that do not exist yet.
+
 - **Diátaxis in `docs/`:** for multi-page docs, organize under
   `docs/getting-started/`, `docs/guides/`, `docs/concepts/`, `docs/reference/`
   and `docs/contributing/` when needed, with `docs/README.md` as the index and
   images in `assets/` or `docs/assets/`. Skip unused directories instead of
   adding empty stubs.
+
 - **README vs `AGENTS.md`:** the README is for using the project, and
   `AGENTS.md` is for changing it. `AGENTS.md` has:
   - the setup, the modules, and the project's own rules for the code and the
@@ -320,8 +326,10 @@ Follow the `repo-docs` and `write-well` skills when writing or revising docs:
 
   Do not put prose rules in `AGENTS.md` that linters or hooks already enforce,
   and do not add a rule-to-enforcer table.
+
 - Planned work that has not started goes in a committed `BACKLOG.md`, and the
   pull request that does an entry removes it.
+
 - Skills for working on this repository go in `.agents/skills/NAME/SKILL.md`.
 
 ## Mode 1: New project
@@ -333,14 +341,15 @@ Follow the `repo-docs` and `write-well` skills when writing or revising docs:
    branch, push develop at the same commit and make it the default with
    `gh repo edit --default-branch develop`. Build the rest on a branch from the
    default branch.
-3. Set up each stack's toolchain, `.gitignore` and BYOR (`--no-gate
-   --non-interactive --no-register` with `craft` plus stack packages). Put the
-   license in `pyproject.toml`, `package.json` or `Cargo.toml`. Commit.
+3. Set up each stack's toolchain, `.gitignore` and BYOR
+   (`--no-gate --non-interactive --no-register` with `craft` plus stack
+   packages). Put the license in `pyproject.toml`, `package.json` or
+   `Cargo.toml`. Commit.
 4. Copy the templates for the detected stacks, stage everything with `git add`
    (since prek checks tracked files), run `prek install`, then
    `prek run --all-files` until it passes, then run the tests. Commit.
-5. Write the README's overview and quick start (add pictures, diagrams and
-   docs links once there is something to show) and write `AGENTS.md`. Commit.
+5. Write the README's overview and quick start (add pictures, diagrams and docs
+   links once there is something to show) and write `AGENTS.md`. Commit.
 6. For a project that ships, write `release.yml` and commit it.
 7. Open a pull request into the default branch.
 
@@ -373,8 +382,9 @@ Use this mode for any existing repository.
       configs, dependencies and hooks (Prettier, ESLint, Husky, lint-staged,
       Biome, markdownlint, Black, isort, Flake8, pylint, mypy, pyright,
       `.luacheckrc` / `selene`, Python `pre-commit`, Dependabot/Renovate).
-      Install the canonical tools and wire BYOR with `--no-gate
-      --non-interactive --no-register` and `craft` plus the stack packages.
+      Install the canonical tools and wire BYOR with
+      `--no-gate --non-interactive --no-register` and `craft` plus the stack
+      packages.
    2. **Pure reformat:** run only the formatters (`prek run` formatter hooks or
       the formatters directly) with no logic edits. When a repository already
       has active pre-commit hooks, keep the pure reformat ahead of enabling

@@ -99,8 +99,8 @@ GitHub URL:
 - **Existing repo:** clones into whichever folder under `~` holds the most repos
   from that owner (tie-broken by latest git activity), or simply opens an
   existing local clone.
-- **New name:** runs `git init` and launches the agent with `"Set up this
-  project"`, triggering the
+- **New name:** runs `git init` and launches the agent with
+  `"Set up this project"`, triggering the
   [project-setup](../ai-harness/skills/project-setup/SKILL.md) skill.
 
 When the parent folder is ambiguous (new name or unknown owner), `Ctrl-T`
@@ -130,9 +130,9 @@ size = 35         # percent
 ```
 
 Template variables for `run`: `{agent}` (CLI + flags), `{prompt}` (formatted per
-agent: `-- PROMPT` for Claude Code/Codex, `-i PROMPT` for Antigravity, or empty),
-`{pr}`, `{file}`, `{dir}` and `{name}`. Built-in layouts also include `review`
-(`nvim gh://{pr}`) and `file` (`nvim {file}`, used by the Files popup).
+agent: `-- PROMPT` for Claude Code/Codex, `-i PROMPT` for Antigravity, or
+empty), `{pr}`, `{file}`, `{dir}` and `{name}`. Built-in layouts also include
+`review` (`nvim gh://{pr}`) and `file` (`nvim {file}`, used by the Files popup).
 
 ## Popups
 
@@ -149,20 +149,21 @@ agent: `-- PROMPT` for Claude Code/Codex, `-i PROMPT` for Antigravity, or empty)
 | Alt-/        | Keys              | Every key binding and where it is configured                     |
 
 Keys are bound in `config/rex/init.lua` (Rex) and `config/tmux/tmux.conf`
-(tmux). In Rex, pressing another popup key switches popups immediately (`Alt-Shift-S`
-opens Rex's own Change Session); tmux ignores popup keys while a popup is open.
-Files opens over Go (`Esc` returns to Go). From a shell, `ws pick NAME` opens
-any popup (`go`, `worktrees`, `sessions`, `agents`, `inbox`/`reviews`, `tasks`,
-`files`); see `ws pick --help` for shared keys.
+(tmux). In Rex, pressing another popup key switches popups immediately
+(`Alt-Shift-S` opens Rex's own Change Session); tmux ignores popup keys while a
+popup is open. Files opens over Go (`Esc` returns to Go). From a shell,
+`ws pick NAME` opens any popup (`go`, `worktrees`, `sessions`, `agents`,
+`inbox`/`reviews`, `tasks`, `files`); see `ws pick --help` for shared keys.
 
 **Shared navigation:** type to filter (typing a project name on Worktrees floats
-its worktrees to the top), arrows or `Ctrl-J`/`Ctrl-K` to move, `Tab`/`Shift-Tab`
-to cycle tabs, `Ctrl-D`/`Ctrl-U` to scroll preview, `Ctrl-R` to refresh while
-keeping current rows visible, and `Esc` to clear filter or close. Pressing
-`Enter` before rows finish loading runs on the top match once it arrives unless
-another key intervenes. A spinner marks tabs still loading.
+its worktrees to the top), arrows or `Ctrl-J`/`Ctrl-K` to move,
+`Tab`/`Shift-Tab` to cycle tabs, `Ctrl-D`/`Ctrl-U` to scroll preview, `Ctrl-R`
+to refresh while keeping current rows visible, and `Esc` to clear filter or
+close. Pressing `Enter` before rows finish loading runs on the top match once it
+arrives unless another key intervenes. A spinner marks tabs still loading.
 
-**Shared actions** (the footer shows only keys valid for the active tab and row):
+**Shared actions** (the footer shows only keys valid for the active tab and
+row):
 
 | Popup          | Enter  | Ctrl-T             | Ctrl-X | Ctrl-F | Ctrl-G | Ctrl-O       |
 | -------------- | ------ | ------------------ | ------ | ------ | ------ | ------------ |
@@ -269,4 +270,5 @@ no vault and sketchybar's `T` stays off.
 ## What ws keeps
 
 `ws` queries git, Rex, tmux and `gh` live. Its own state lives under
-`~/.local/state/ws`; see [pkgs/ws/AGENTS.md](../pkgs/ws/AGENTS.md#what-ws-keeps).
+`~/.local/state/ws`; see
+[pkgs/ws/AGENTS.md](../pkgs/ws/AGENTS.md#what-ws-keeps).

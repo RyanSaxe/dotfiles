@@ -1,0 +1,6 @@
+# Managed by BYOR. Manual edits may be overwritten.
+# Git ignores the personal rule files in this directory, and ast-grep's
+# rule discovery respects gitignore. ast-grep also reads .ignore files
+# (git does not), so these negations keep the rules visible to ast-grep.
+!*.yml
+!*.yaml
