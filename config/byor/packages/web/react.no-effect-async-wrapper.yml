@@ -1,0 +1,33 @@
+id: react.no-effect-async-wrapper
+language: Tsx
+severity: error
+message: Do not wrap state updates in `queueMicrotask` or `startTransition` inside an effect to silence effect lint rules.
+rule:
+  all:
+    - any:
+        - pattern: queueMicrotask($$$ARGS)
+        - pattern: window.queueMicrotask($$$ARGS)
+        - pattern: globalThis.queueMicrotask($$$ARGS)
+        - pattern: startTransition($$$ARGS)
+        - pattern: React.startTransition($$$ARGS)
+    - inside:
+        any:
+          - pattern: useEffect($$$EFFECT_ARGS)
+          - pattern: useLayoutEffect($$$EFFECT_ARGS)
+          - pattern: React.useEffect($$$EFFECT_ARGS)
+          - pattern: React.useLayoutEffect($$$EFFECT_ARGS)
+        stopBy: end
+metadata:
+  byor:
+    rationale: >
+      Deferring `setState` with `queueMicrotask` or `startTransition` inside
+      `useEffect` / `useLayoutEffect` bypasses `react-hooks/set-state-in-effect`
+      without eliminating the extra render pass or fixing the data flow.
+    agent_prompt: >
+      Remove the `queueMicrotask` or `startTransition` wrapper inside the
+      effect. Derive the value during render, update state in the triggering
+      event handler, reset state with a `key`, or subscribe with
+      `useSyncExternalStore`.
+    tags:
+      - react
+      - web
