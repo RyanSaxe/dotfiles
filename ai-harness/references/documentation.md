@@ -37,6 +37,16 @@ Add `docs/contributing/` only when contributor workflow needs more than
 `AGENTS.md`. Skip any directory the project does not yet need instead of adding
 empty stubs.
 
+`docs/concepts/architecture.md` explains the architecture of the solution, not a
+list of folders, files or modules. Focus on the core problem, the design thesis,
+how data and control flow across major components and *why* the architectural
+seams and invariants exist. Put directory maps, module inventories and CLI flag
+tables in `docs/reference/` or `docs/contributing/`.
+
+Never announce a repository's lint rules, import-boundary rules or static-check
+catalogs anywhere in `docs/` (including `docs/contributing/`). CI and config
+files are the source of truth for contributors.
+
 ## Diagrams in GitHub Markdown
 
 Prefer committed light and dark SVG files inside a `<picture>` element over
