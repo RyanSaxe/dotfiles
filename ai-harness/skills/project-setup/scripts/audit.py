@@ -60,7 +60,7 @@ PRUNE_DIRS = frozenset({".git", "node_modules", ".venv", "venv", "target", "dist
     {"__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".rumdl_cache", ".next", ".astro"}
 )
 SKIP_SIZE_EXTS = (
-    frozenset({".lock", ".svg", ".json", ".jsonc", ".csv", ".tsv", ".jsonl", ".ndjson", ".sql", ".xml"})
+    frozenset({".lock", ".svg", ".json", ".jsonc", ".csv", ".tsv", ".jsonl", ".ndjson", ".sql", ".xml", ".txt"})
     | frozenset({".md", ".mdx", ".markdown", ".map", ".snap", ".po", ".pot"})
     | frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".mp4", ".webm", ".mov"})
     | frozenset({".woff", ".woff2", ".ttf", ".otf", ".eot"})
@@ -89,20 +89,12 @@ STACK_EXTS: dict[str, frozenset[str]] = {
 TS_EXTS = frozenset({".ts", ".tsx", ".mts", ".cts"})
 REACT_EXTS = frozenset({".jsx", ".tsx"})
 
+_LEGACY_WF_TOOLS = frozenset({"prettier", "eslint", "markdownlint", "black", "isort", "flake8"}) | frozenset(
+    {"pylint", "mypy", "pyright", "biome", "selene", "husky"}
+)
 WORKFLOW_LEGACY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("pre-commit", re.compile(r"pre-commit/action|\bpre-commit\s+run\b")),
-    ("prettier", re.compile(r"\bprettier\b")),
-    ("eslint", re.compile(r"\beslint\b")),
-    ("markdownlint", re.compile(r"\bmarkdownlint\b")),
-    ("black", re.compile(r"\bblack\b")),
-    ("isort", re.compile(r"\bisort\b")),
-    ("flake8", re.compile(r"\bflake8\b")),
-    ("pylint", re.compile(r"\bpylint\b")),
-    ("mypy", re.compile(r"\bmypy\b")),
-    ("pyright", re.compile(r"\bpyright\b")),
-    ("biome", re.compile(r"\bbiome\b")),
-    ("selene", re.compile(r"\bselene\b")),
-    ("husky", re.compile(r"\bhusky\b")),
+    *((tool, re.compile(rf"\b{tool}\b")) for tool in sorted(_LEGACY_WF_TOOLS)),
 )
 
 NON_CI_WORKFLOW_STEMS = frozenset({"release", "publish", "deploy", "pages", "docs", "codeql", "stale", "labeler"})
@@ -243,11 +235,16 @@ def _has_zsh_files(root: Path, files: list[str]) -> bool:
     return False
 
 
+def _is_fixture_path(rel: str) -> bool:
+    return "fixtures" in Path(rel).parts[:-1]
+
+
 def _detect_stacks(root: Path, files: list[str], *, package_json: dict[str, Any]) -> dict[str, Any]:
+    source_files = [rel for rel in files if not _is_fixture_path(rel)]
     counts: dict[str, int] = dict.fromkeys(STACK_EXTS, 0)
     ts_count = 0
     react_count = 0
-    for rel in files:
+    for rel in source_files:
         ext = Path(rel).suffix.lower()
         for stack, exts in STACK_EXTS.items():
             if ext in exts:
@@ -257,14 +254,17 @@ def _detect_stacks(root: Path, files: list[str], *, package_json: dict[str, Any]
 
     node_deps = _collect_node_deps(package_json)
     has_python_marker = (
-        (root / "pyproject.toml").is_file() or (root / "setup.py").is_file() or any(root.glob("requirements*.txt"))
+        (root / "pyproject.toml").is_file()
+        or (root / "setup.py").is_file()
+        or any(root.glob("requirements*.txt"))
+        or any(Path(rel).name == "pyproject.toml" for rel in source_files)
     )
     markers = {
         "python": has_python_marker,
         "web": (root / "package.json").is_file(),
         "markdown": False,
         "rust": (root / "Cargo.toml").is_file(),
-        "go": (root / "go.mod").is_file() or any(Path(rel).name == "go.mod" for rel in files),
+        "go": (root / "go.mod").is_file() or any(Path(rel).name == "go.mod" for rel in source_files),
         "lua": False,
         "notebooks": False,
         "shell": False,
@@ -275,7 +275,7 @@ def _detect_stacks(root: Path, files: list[str], *, package_json: dict[str, Any]
         "present": present,
         "has_typescript": ts_count > 0 or (root / "tsconfig.json").is_file() or "typescript" in node_deps,
         "has_react": react_count > 0 or "react" in node_deps,
-        "has_zsh": _has_zsh_files(root, files),
+        "has_zsh": _has_zsh_files(root, source_files),
         "typescript_files": ts_count,
         "react_files": react_count,
     }
@@ -305,25 +305,34 @@ def _parse_workflow_jobs(text: str) -> list[str]:
     return jobs
 
 
+def _read_workflow_entry(root: Path, path: Path) -> tuple[dict[str, Any], bool]:
+    text = _read_text(path) or ""
+    entry = {
+        "path": path.relative_to(root).as_posix(),
+        "jobs": _parse_workflow_jobs(text),
+        "legacy_tools": [name for name, pat in WORKFLOW_LEGACY_PATTERNS if pat.search(text)],
+    }
+    return entry, bool(re.search(r"\bprek\b", text))
+
+
 def _inspect_workflows(root: Path) -> dict[str, Any]:
     wf_dir = root / ".github" / "workflows"
     entries: list[dict[str, Any]] = []
     ci_workflows: list[str] = []
+    prek_stems: set[str] = set()
     if wf_dir.is_dir():
         for path in sorted([*wf_dir.glob("*.yml"), *wf_dir.glob("*.yaml")]):
-            text = _read_text(path) or ""
-            rel = path.relative_to(root).as_posix()
-            entries.append(
-                {
-                    "path": rel,
-                    "jobs": _parse_workflow_jobs(text),
-                    "legacy_tools": [name for name, pat in WORKFLOW_LEGACY_PATTERNS if pat.search(text)],
-                }
-            )
-            if path.stem.lower() not in NON_CI_WORKFLOW_STEMS:
-                ci_workflows.append(rel)
+            entry, runs_prek = _read_workflow_entry(root, path)
+            entries.append(entry)
+            stem = path.stem.lower()
+            if runs_prek:
+                prek_stems.add(stem)
+            if stem not in NON_CI_WORKFLOW_STEMS:
+                ci_workflows.append(entry["path"])
 
-    has_check_yml = (wf_dir / "check.yml").is_file()
+    has_check_yml = (wf_dir / "check.yml").is_file() or (wf_dir / "check.yaml").is_file()
+    if has_check_yml and "ci" in prek_stems and "check" not in prek_stems:
+        ci_workflows = [rel for rel in ci_workflows if Path(rel).stem.lower() != "check"]
     fragmented = len(ci_workflows) > 1 or (len(ci_workflows) == 1 and not has_check_yml)
     return {
         "files": entries,
@@ -380,55 +389,42 @@ def _legacy_python_tools(root: Path, pyproject: dict[str, Any]) -> list[dict[str
 
 def _legacy_web_tools(root: Path, files: list[str], *, package_json: dict[str, Any]) -> list[dict[str, Any]]:
     node_deps = _collect_node_deps(package_json)
-    findings: list[dict[str, Any]] = []
-
-    def add(tool: str, evidence: list[str]) -> None:
-        if evidence:
-            findings.append({"category": "web", "tool": tool, "evidence": sorted(set(evidence))})
-
-    prettier_ev = [
-        rel
-        for rel in files
-        if Path(rel).name.startswith((".prettierrc", "prettier.config.")) or Path(rel).name == ".prettierignore"
-    ]
-    if "prettier" in package_json:
-        prettier_ev.append("package.json:prettier")
-    prettier_ev.extend(
-        f"package.json-dep:{dep}" for dep in node_deps if dep == "prettier" or dep.startswith("prettier-plugin-")
+    named = [(rel, Path(rel).name) for rel in files]
+    groups = (
+        (
+            "prettier",
+            [rel for rel, n in named if n.startswith((".prettierrc", "prettier.config.")) or n == ".prettierignore"]
+            + (["package.json:prettier"] if "prettier" in package_json else [])
+            + [f"package.json-dep:{d}" for d in node_deps if d == "prettier" or d.startswith("prettier-plugin-")],
+        ),
+        (
+            "eslint",
+            [rel for rel, n in named if n.startswith((".eslintrc", "eslint.config.")) or n == ".eslintignore"]
+            + (["package.json:eslintConfig"] if "eslintConfig" in package_json else [])
+            + [
+                f"package.json-dep:{d}"
+                for d in node_deps
+                if d == "eslint" or d.startswith(("eslint-", "@eslint/", "@typescript-eslint/"))
+            ],
+        ),
+        (
+            "husky",
+            ([".husky/"] if (root / ".husky").is_dir() else [])
+            + (["package.json-dep:husky"] if "husky" in node_deps else []),
+        ),
+        (
+            "lint-staged",
+            [rel for rel, n in named if n.startswith((".lintstagedrc", "lint-staged.config."))]
+            + (["package.json:lint-staged"] if "lint-staged" in package_json else [])
+            + (["package.json-dep:lint-staged"] if "lint-staged" in node_deps else []),
+        ),
+        (
+            "biome",
+            [rel for rel, n in named if n in {"biome.json", "biome.jsonc"}]
+            + (["package.json-dep:@biomejs/biome"] if "@biomejs/biome" in node_deps else []),
+        ),
     )
-    add("prettier", prettier_ev)
-
-    eslint_ev = [
-        rel
-        for rel in files
-        if Path(rel).name.startswith((".eslintrc", "eslint.config.")) or Path(rel).name == ".eslintignore"
-    ]
-    if "eslintConfig" in package_json:
-        eslint_ev.append("package.json:eslintConfig")
-    eslint_ev.extend(
-        f"package.json-dep:{dep}"
-        for dep in node_deps
-        if dep == "eslint" or dep.startswith(("eslint-", "@eslint/", "@typescript-eslint/"))
-    )
-    add("eslint", eslint_ev)
-
-    husky_ev = ([".husky/"] if (root / ".husky").is_dir() else []) + (
-        ["package.json-dep:husky"] if "husky" in node_deps else []
-    )
-    add("husky", husky_ev)
-
-    lint_staged_ev = [rel for rel in files if Path(rel).name.startswith((".lintstagedrc", "lint-staged.config."))]
-    if "lint-staged" in package_json:
-        lint_staged_ev.append("package.json:lint-staged")
-    if "lint-staged" in node_deps:
-        lint_staged_ev.append("package.json-dep:lint-staged")
-    add("lint-staged", lint_staged_ev)
-
-    biome_ev = [rel for rel in files if Path(rel).name in {"biome.json", "biome.jsonc"}]
-    if "@biomejs/biome" in node_deps:
-        biome_ev.append("package.json-dep:@biomejs/biome")
-    add("biome", biome_ev)
-    return findings
+    return [{"category": "web", "tool": tool, "evidence": sorted(set(ev))} for tool, ev in groups if ev]
 
 
 def _legacy_lua_tools(root: Path, files: list[str], *, workflows: dict[str, Any]) -> list[dict[str, Any]]:
@@ -472,16 +468,10 @@ def _inspect_legacy_tooling(
             precommit_ev.append("note: keep .pre-commit-config.yaml for prek")
         findings.append({"category": "pre-commit", "tool": "pre-commit", "evidence": sorted(set(precommit_ev))})
 
-    bots = (
-        ".github/dependabot.yml",
-        ".github/dependabot.yaml",
-        "renovate.json",
-        "renovate.json5",
-        ".renovaterc",
-        ".renovaterc.json",
-        ".github/renovate.json",
-    )
-    bot_ev = [rel for rel in bots if (root / rel).is_file()]
+    bots = frozenset(
+        {".github/dependabot.yml", ".github/dependabot.yaml", "renovate.json", "renovate.json5"}
+    ) | frozenset({".renovaterc", ".renovaterc.json", ".github/renovate.json"})
+    bot_ev = sorted(rel for rel in bots if (root / rel).is_file())
     if bot_ev:
         findings.append({"category": "dependency-bots", "tool": "dependabot/renovate", "evidence": bot_ev})
     return findings
@@ -519,31 +509,54 @@ def _missing_ruff_rules(ruff_cfg: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _missing_setup_uv_pin(root: Path) -> list[dict[str, str]]:
-    text = _read_text(root / ".github" / "workflows" / "check.yml") or ""
-    unpinned = sorted(
-        {
-            f"@{ref}" if ref else "(unpinned)"
-            for m in SETUP_UV_RE.finditer(text)
-            if not ((ref := m.group(1)) and SEMVER_PIN_RE.fullmatch(ref))
-        }
-    )
-    if not unpinned:
+    wf_dir = root / ".github" / "workflows"
+    if not wf_dir.is_dir():
         return []
-    detail = f"pin astral-sh/setup-uv to full semver like @v10.4.0 (found: {', '.join(unpinned)})"
-    return [{"scope": "python", "item": "check.yml setup-uv semver pin", "detail": detail}]
-
-
-def _missing_python_configs(root: Path, pyproject: dict[str, Any], *, precommit_text: str) -> list[dict[str, str]]:
     missing: list[dict[str, str]] = []
-    if not (root / "pyproject.toml").is_file():
-        missing.append({"scope": "python", "item": "pyproject.toml", "detail": "uv project metadata and tool settings"})
-    if not (root / "uv.lock").is_file():
-        missing.append({"scope": "python", "item": "uv.lock", "detail": "committed uv lockfile"})
-    missing.extend(_missing_ruff_rules(_as_dict(_as_dict(pyproject.get("tool")).get("ruff"))))
-    if "ty" not in _collect_python_deps(root, pyproject) and "ty-pre-commit" not in precommit_text:
-        missing.append({"scope": "python", "item": "ty", "detail": "add ty to dev deps and .pre-commit-config.yaml"})
-    missing.extend(_missing_setup_uv_pin(root))
+    for path in sorted([*wf_dir.glob("*.yml"), *wf_dir.glob("*.yaml")]):
+        text = _read_text(path) or ""
+        unpinned = sorted(
+            {
+                f"@{ref}" if ref else "(unpinned)"
+                for m in SETUP_UV_RE.finditer(text)
+                if not ((ref := m.group(1)) and SEMVER_PIN_RE.fullmatch(ref))
+            }
+        )
+        if unpinned:
+            detail = f"pin astral-sh/setup-uv to full semver like @v10.4.0 (found: {', '.join(unpinned)})"
+            missing.append({"scope": "universal", "item": f"{path.name} setup-uv semver pin", "detail": detail})
     return missing
+
+
+def _missing_python_project_configs(proj_dir: Path, root: Path, *, precommit_text: str) -> list[dict[str, str]]:
+    prefix = "" if proj_dir == root else f"{proj_dir.relative_to(root).as_posix()}/"
+    pyproject = _read_toml(proj_dir / "pyproject.toml")
+    missing: list[dict[str, str]] = []
+    if not (proj_dir / "uv.lock").is_file():
+        missing.append({"scope": "python", "item": f"{prefix}uv.lock", "detail": "committed uv lockfile"})
+    missing.extend(
+        {**entry, "item": f"{prefix}{entry['item']}"}
+        for entry in _missing_ruff_rules(_as_dict(_as_dict(pyproject.get("tool")).get("ruff")))
+    )
+    has_ty_hook = "ty-pre-commit" in precommit_text or "ty check" in precommit_text
+    if "ty" not in _collect_python_deps(proj_dir, pyproject) and not has_ty_hook:
+        detail = "add ty to dev deps and .pre-commit-config.yaml"
+        missing.append({"scope": "python", "item": f"{prefix}ty", "detail": detail})
+    return missing
+
+
+def _missing_python_configs(root: Path, files: list[str], *, precommit_text: str) -> list[dict[str, str]]:
+    proj_dirs = (
+        [root]
+        if (root / "pyproject.toml").is_file()
+        else sorted(
+            {root / Path(r).parent for r in files if not _is_fixture_path(r) and Path(r).name == "pyproject.toml"}
+        )
+    )
+    if not proj_dirs:
+        first = {"scope": "python", "item": "pyproject.toml", "detail": "uv project metadata and tool settings"}
+        return [first, *_missing_python_project_configs(root, root, precommit_text=precommit_text)]
+    return [e for d in proj_dirs for e in _missing_python_project_configs(d, root, precommit_text=precommit_text)]
 
 
 def _missing_react_oxlint_plugins(cfg: dict[str, Any]) -> list[dict[str, str]]:
@@ -575,11 +588,12 @@ def _missing_oxlint_rules(root: Path, stacks: dict[str, Any]) -> list[dict[str, 
 def _missing_web_configs(root: Path, stacks: dict[str, Any], *, package_json: dict[str, Any]) -> list[dict[str, str]]:
     missing: list[dict[str, str]] = []
     node_deps = _collect_node_deps(package_json)
-    for rel, detail in (
-        ("package-lock.json", "committed npm lockfile"),
-        (".oxfmtrc.json", "oxfmt config"),
-        (".oxlintrc.json", "oxlint config"),
-    ):
+    pkg_mgr = package_json.get("packageManager")
+    uses_pnpm = (root / "pnpm-workspace.yaml").is_file() or (isinstance(pkg_mgr, str) and pkg_mgr.startswith("pnpm"))
+    lockfile = (
+        ("pnpm-lock.yaml", "committed pnpm lockfile") if uses_pnpm else ("package-lock.json", "committed npm lockfile")
+    )
+    for rel, detail in (lockfile, (".oxfmtrc.json", "oxfmt config"), (".oxlintrc.json", "oxlint config")):
         if not (root / rel).is_file():
             missing.append({"scope": "web", "item": rel, "detail": detail})
     missing.extend(
@@ -613,17 +627,16 @@ def _missing_rust_configs(root: Path) -> list[dict[str, str]]:
 
 
 def _find_golangci_cfg(root: Path, mod_dir: Path) -> Path | None:
-    dirs = (mod_dir, Path()) if mod_dir != Path() else (Path(),)
-    for rel_dir in dirs:
-        for name in (".golangci.yml", ".golangci.yaml"):
-            candidate = root / rel_dir / name
-            if candidate.is_file():
-                return candidate
-    return None
+    return next(
+        (c for d in (mod_dir, Path()) for n in (".golangci.yml", ".golangci.yaml") if (c := root / d / n).is_file()),
+        None,
+    )
 
 
 def _missing_go_configs(root: Path, files: list[str]) -> list[dict[str, str]]:
-    mod_dirs = sorted({Path(rel).parent for rel in files if Path(rel).name == "go.mod"}) or [Path()]
+    mod_dirs = sorted(
+        {Path(rel).parent for rel in files if not _is_fixture_path(rel) and Path(rel).name == "go.mod"}
+    ) or [Path()]
     missing: list[dict[str, str]] = []
     for mod_dir in mod_dirs:
         cfg_path = _find_golangci_cfg(root, mod_dir)
@@ -678,28 +691,8 @@ def _missing_shell_nix_configs(stacks: dict[str, Any], *, precommit_text: str) -
     ]
 
 
-def _missing_systems_configs(
-    root: Path, stacks: dict[str, Any], *, files: list[str], precommit_text: str
-) -> list[dict[str, str]]:
-    present: dict[str, int] = stacks["present"]
-    missing: list[dict[str, str]] = []
-    if "rust" in present:
-        missing.extend(_missing_rust_configs(root))
-    if "go" in present:
-        missing.extend(_missing_go_configs(root, files))
-    if "lua" in present:
-        missing.extend(_missing_lua_configs(root, precommit_text=precommit_text))
-    missing.extend(_missing_shell_nix_configs(stacks, precommit_text=precommit_text))
-    return missing
-
-
 def _inspect_missing_configs(
-    root: Path,
-    stacks: dict[str, Any],
-    *,
-    files: list[str],
-    pyproject: dict[str, Any],
-    package_json: dict[str, Any],
+    root: Path, stacks: dict[str, Any], *, files: list[str], package_json: dict[str, Any]
 ) -> list[dict[str, str]]:
     missing: list[dict[str, str]] = [
         {"scope": "universal", "item": rel, "detail": detail}
@@ -713,18 +706,28 @@ def _inspect_missing_configs(
         )
         if not (root / rel).is_file()
     ]
-
+    missing.extend(_missing_setup_uv_pin(root))
     precommit_text = _read_text(root / ".pre-commit-config.yaml") or ""
     if precommit_text and "max-file-lines" not in precommit_text:
-        detail = "1,000-line hard cap in .pre-commit-config.yaml"
-        missing.append({"scope": "universal", "item": "max-file-lines hook", "detail": detail})
-
+        missing.append(
+            {
+                "scope": "universal",
+                "item": "max-file-lines hook",
+                "detail": "1,000-line hard cap in .pre-commit-config.yaml",
+            }
+        )
     present = stacks["present"]
-    if "python" in present:
-        missing.extend(_missing_python_configs(root, pyproject, precommit_text=precommit_text))
-    if "web" in present:
-        missing.extend(_missing_web_configs(root, stacks, package_json=package_json))
-    missing.extend(_missing_systems_configs(root, stacks, files=files, precommit_text=precommit_text))
+    handlers = (
+        ("python", lambda: _missing_python_configs(root, files, precommit_text=precommit_text)),
+        ("web", lambda: _missing_web_configs(root, stacks, package_json=package_json)),
+        ("rust", lambda: _missing_rust_configs(root)),
+        ("go", lambda: _missing_go_configs(root, files)),
+        ("lua", lambda: _missing_lua_configs(root, precommit_text=precommit_text)),
+    )
+    for stack, fn in handlers:
+        if stack in present:
+            missing.extend(fn())
+    missing.extend(_missing_shell_nix_configs(stacks, precommit_text=precommit_text))
     return missing
 
 
@@ -762,10 +765,8 @@ def _parse_simple_yaml_bool(text: str, key: str) -> bool | None:
     for raw_line in text.splitlines():
         if pattern.match(raw_line):
             val = raw_line.split(":", 1)[1].split("#", 1)[0].strip().lower()
-            if val == "true":
-                return True
-            if val == "false":
-                return False
+            if val in {"true", "false"}:
+                return val == "true"
     return None
 
 
@@ -810,7 +811,7 @@ def _inspect_file_sizes(root: Path, files: list[str]) -> dict[str, Any]:
     warning: list[dict[str, Any]] = []
     hard_cap: list[dict[str, Any]] = []
     for rel in files:
-        if Path(rel).suffix.lower() in SKIP_SIZE_EXTS or SKIP_SIZE_RE.search(rel):
+        if _is_fixture_path(rel) or Path(rel).suffix.lower() in SKIP_SIZE_EXTS or SKIP_SIZE_RE.search(rel):
             continue
         try:
             raw = (root / rel).read_bytes()
@@ -862,9 +863,7 @@ def audit_repository(root: Path) -> dict[str, Any]:
             resolved, files, pyproject=pyproject, package_json=package_json, workflows=workflows
         ),
         "workflows": workflows,
-        "missing_configs": _inspect_missing_configs(
-            resolved, stacks, files=files, pyproject=pyproject, package_json=package_json
-        ),
+        "missing_configs": _inspect_missing_configs(resolved, stacks, files=files, package_json=package_json),
         "byor": _inspect_byor(resolved, stacks),
         "tools": {tool: shutil.which(tool) is not None for tool in PARITY_TOOLS},
         "file_sizes": _inspect_file_sizes(resolved, files),
@@ -942,12 +941,10 @@ def format_markdown(report: dict[str, Any]) -> str:
     )
     lines.extend(["", *_format_workflows_section(report["workflows"])])
     missing_rows = [f"| {m['scope']} | `{m['item']}` | {m['detail']} |" for m in report["missing_configs"]]
+    no_missing = "All canonical files and configs are present."
     lines.extend(
         _md_table(
-            "Missing canonical files and configs",
-            "| Scope | Missing | Why |",
-            rows=missing_rows,
-            empty="All canonical files and configs are present.",
+            "Missing canonical files and configs", "| Scope | Missing | Why |", rows=missing_rows, empty=no_missing
         )
     )
     byor = report["byor"]
@@ -963,19 +960,16 @@ def format_markdown(report: dict[str, Any]) -> str:
     ]
     lines.extend(_md_table("BYOR wiring", "| Check | Status |", rows=byor_rows))
     lines.extend(["", *_format_sizes_section(report["file_sizes"])])
-    tool_rows = [f"| `{name}` | {_yn(available)} |" for name, available in report["tools"].items()]
+    tool_rows = [f"| `{n}` | {_yn(ok)} |" for n, ok in report["tools"].items()]
     lines.extend(_md_table("Local tools", "| Tool | Available |", rows=tool_rows))
-    hygiene = report["git_hygiene"]
-    hygiene_rows = [
-        f"| `{name}` | {_yn(hygiene[key])} |"
-        for name, key in (
-            (".git-blame-ignore-revs", "has_git_blame_ignore_revs"),
-            ("BACKLOG.md", "has_backlog_md"),
-            ("AGENTS.md", "has_agents_md"),
-            ("README.md", "has_readme_md"),
-        )
+    h = report["git_hygiene"]
+    h_rows = [
+        f"| `.git-blame-ignore-revs` | {_yn(h['has_git_blame_ignore_revs'])} |",
+        f"| `BACKLOG.md` | {_yn(h['has_backlog_md'])} |",
+        f"| `AGENTS.md` | {_yn(h['has_agents_md'])} |",
+        f"| `README.md` | {_yn(h['has_readme_md'])} |",
     ]
-    lines.extend(_md_table("Git hygiene", "| File | Present |", rows=hygiene_rows))
+    lines.extend(_md_table("Git hygiene", "| File | Present |", rows=h_rows))
     return "\n".join(lines) + "\n"
 
 

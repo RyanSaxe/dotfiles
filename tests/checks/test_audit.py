@@ -8,6 +8,7 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[2]
 AUDIT_SCRIPT = REPO / "ai-harness/skills/project-setup/scripts/audit.py"
+CHECK_YML_TEMPLATE = REPO / "ai-harness/skills/project-setup/templates/check.yml"
 EMMYRC_TEMPLATE = REPO / "ai-harness/skills/project-setup/templates/emmyrc.json"
 OXLINTRC_TEMPLATE = REPO / "ai-harness/skills/project-setup/templates/oxlintrc.json"
 JSONC_TOKEN_RE = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
@@ -169,3 +170,136 @@ def test_audit_checks_react_oxlint_plugins_and_restricted_imports(tmp_path: Path
     after_items = {entry["item"] for entry in after["missing_configs"]}
     assert ".oxlintrc.json parity rules" not in after_items
     assert ".oxlintrc.json React plugins" not in after_items
+
+
+def test_check_yml_template_pins_shfmt_3_14_1() -> None:
+    text = CHECK_YML_TEMPLATE.read_text(encoding="utf-8")
+    assert "tool: shfmt@3.14.1" in text
+    assert "shfmt@3.11.0" not in text
+
+
+def test_audit_skips_fixtures_and_txt_in_stack_detection_and_file_sizes(tmp_path: Path) -> None:
+    fixtures = tmp_path / "engine/tests/fixtures/languages"
+    fixtures.mkdir(parents=True)
+    (fixtures / "sample.go").write_text("package main\nfunc main() {}\n", encoding="utf-8")
+    (fixtures / "sample.sh").write_text("#!/bin/sh\necho hi\n", encoding="utf-8")
+    (fixtures / "sample.tsx").write_text("export const X = () => <div />;\n", encoding="utf-8")
+    (fixtures / "go.mod").write_text("module example.com/fixture\n", encoding="utf-8")
+    (fixtures / "huge.py").write_text("x = 1\n" * 1100, encoding="utf-8")
+
+    # Non-fixture file named fixtures.ts must still be counted as web/TypeScript.
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/fixtures.ts").write_text("export const x = 1;\n", encoding="utf-8")
+    # Non-fixture .txt file over 1,000 lines is skipped from file_sizes, while .py is flagged.
+    (tmp_path / "notes.txt").write_text("line\n" * 1100, encoding="utf-8")
+    (tmp_path / "big.rs").write_text("fn f() {}\n" * 1050, encoding="utf-8")
+
+    report = _run_audit(tmp_path)
+    present = report["stacks"]["present"]
+    assert "go" not in present
+    assert "shell" not in present
+    assert "python" not in present
+    assert "web" in present
+    assert report["stacks"]["has_typescript"] is True
+    assert report["stacks"]["has_react"] is False
+
+    hard_cap_paths = [entry["path"] for entry in report["file_sizes"]["hard_cap_files"]]
+    assert hard_cap_paths == ["big.rs"]
+
+
+def test_audit_recognizes_pnpm_workspace_lockfile(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.34.6",
+                "devDependencies": {"oxlint": "1.0.0", "oxfmt": "1.0.0"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-workspace.yaml").write_text("packages:\n  - packages/*\n", encoding="utf-8")
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (tmp_path / ".oxfmtrc.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / ".oxlintrc.json").write_text(OXLINTRC_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+
+    report = _run_audit(tmp_path)
+    missing_items = {entry["item"] for entry in report["missing_configs"]}
+    assert "package-lock.json" not in missing_items
+    assert "pnpm-lock.yaml" not in missing_items
+
+    (tmp_path / "pnpm-lock.yaml").unlink()
+    missing_lock = _run_audit(tmp_path)
+    missing_lock_items = {entry["item"] for entry in missing_lock["missing_configs"]}
+    assert "pnpm-lock.yaml" in missing_lock_items
+    assert "package-lock.json" not in missing_lock_items
+
+
+def test_audit_detects_subdirectory_uv_project_without_root_pyproject(tmp_path: Path) -> None:
+    sub = tmp_path / "tools/sound"
+    sub.mkdir(parents=True)
+    (sub / "pyproject.toml").write_text(
+        '[project]\nname = "sound"\nversion = "0.1.0"\n'
+        '[dependency-groups]\ndev = ["ty"]\n'
+        '[tool.ruff.lint]\nselect = ["ALL"]\n'
+        "[tool.ruff.lint.mccabe]\nmax-complexity = 8\n"
+        "[tool.ruff.lint.pylint]\nmax-positional-args = 2\nmax-branches = 10\nmax-nested-blocks = 4\n"
+        '[tool.ruff.lint.flake8-tidy-imports.banned-api]\n"typing.cast".msg = "no cast"\n',
+        encoding="utf-8",
+    )
+    (sub / "uv.lock").write_text("", encoding="utf-8")
+    (sub / "synth.py").write_text("def tone() -> int:\n    return 440\n", encoding="utf-8")
+
+    report = _run_audit(tmp_path)
+    assert "python" in report["stacks"]["present"]
+    py_missing = [entry["item"] for entry in report["missing_configs"] if entry["scope"] == "python"]
+    assert py_missing == []
+
+    (sub / "uv.lock").unlink()
+    without_lock = _run_audit(tmp_path)
+    py_missing_after = [entry["item"] for entry in without_lock["missing_configs"] if entry["scope"] == "python"]
+    assert py_missing_after == ["tools/sound/uv.lock"]
+
+
+def test_audit_checks_setup_uv_across_all_workflows_and_handles_domain_check_yml(tmp_path: Path) -> None:
+    wf = tmp_path / ".github/workflows"
+    wf.mkdir(parents=True)
+    (wf / "check.yml").write_text(
+        "name: domain-check\njobs:\n  domain:\n    steps:\n      - run: echo ok\n",
+        encoding="utf-8",
+    )
+    (wf / "ci.yml").write_text(
+        "name: ci\njobs:\n  check:\n    steps:\n"
+        "      - uses: astral-sh/setup-uv@v6\n"
+        "      - run: uvx prek@0.5.11 run --all-files\n",
+        encoding="utf-8",
+    )
+    (wf / "release.yml").write_text(
+        "name: release\njobs:\n  pub:\n    steps:\n      - uses: astral-sh/setup-uv@v7\n",
+        encoding="utf-8",
+    )
+
+    report = _run_audit(tmp_path)
+    assert report["workflows"]["fragmented"] is False
+    assert report["workflows"]["ci_workflow_count"] == 1
+    missing_items = {entry["item"] for entry in report["missing_configs"]}
+    assert "ci.yml setup-uv semver pin" in missing_items
+    assert "release.yml setup-uv semver pin" in missing_items
+
+    # Pinning setup-uv clears both findings; adding another CI workflow still flags fragmentation.
+    (wf / "ci.yml").write_text(
+        "name: ci\njobs:\n  check:\n    steps:\n"
+        "      - uses: astral-sh/setup-uv@v10.4.0\n"
+        "      - run: uvx prek@0.5.11 run --all-files\n",
+        encoding="utf-8",
+    )
+    (wf / "release.yml").write_text(
+        "name: release\njobs:\n  pub:\n    steps:\n      - uses: astral-sh/setup-uv@v10.4.0\n",
+        encoding="utf-8",
+    )
+    (wf / "lint.yml").write_text("name: lint\njobs:\n  lint:\n    steps:\n      - run: echo lint\n", encoding="utf-8")
+
+    after = _run_audit(tmp_path)
+    after_items = {entry["item"] for entry in after["missing_configs"]}
+    assert "ci.yml setup-uv semver pin" not in after_items
+    assert "release.yml setup-uv semver pin" not in after_items
+    assert after["workflows"]["fragmented"] is True
