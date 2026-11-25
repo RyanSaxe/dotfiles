@@ -1,8 +1,13 @@
-# Documentation
+---
+name: repo-docs
+description: Use when writing, reorganizing or auditing a repository's README.md, docs/ tree, architecture documentation or GitHub Markdown diagrams. Covers README structure, Diátaxis layout, solution-focused architecture docs and light/dark SVG diagrams. Pair with write-well for general prose craft.
+---
+
+# Repository documentation
 
 Write documentation for a reader who was not part of the work. Keep it concise,
-scannable and verified against the code. Pair this standard with `write-well`
-when drafting or revising prose.
+scannable and verified against the code. Pair this skill with `write-well` when
+drafting or revising prose.
 
 ## READMEs
 
@@ -16,7 +21,11 @@ screen:
 3. **Fast quick start:** the minimal real commands or code to try it.
 4. **Links into `docs/`:** a short table or list pointing to deeper pages
    instead of duplicating manuals in the README.
-5. **License** (when the repository has one).
+
+Keep a root `LICENSE` file so GitHub surfaces the license in the repository
+sidebar rather than adding a redundant `## License` stub to the README. Keep
+special legal notices in the README only when required, such as a Fan Content
+Policy.
 
 Keep prose tight: never a dry stub and never a bloated wall of text. Leave out
 status banners, roadmap promises and features that do not exist yet.
@@ -37,11 +46,11 @@ Add `docs/contributing/` only when contributor workflow needs more than
 `AGENTS.md`. Skip any directory the project does not yet need instead of adding
 empty stubs.
 
-`docs/concepts/architecture.md` explains the architecture of the solution, not a
-list of folders, files or modules. Focus on the core problem, the design thesis,
-how data and control flow across major components and *why* the architectural
-seams and invariants exist. Put directory maps, module inventories and CLI flag
-tables in `docs/reference/` or `docs/contributing/`.
+`docs/concepts/architecture.md` explains the architecture of the solution, never
+a folder, file or module inventory. Focus on the core problem, the design
+thesis, how data and control flow across major components and *why* the
+architectural seams and invariants exist. Put directory maps, module inventories
+and CLI flag tables in `docs/reference/` or `docs/contributing/`.
 
 Never announce a repository's lint rules, import-boundary rules or static-check
 catalogs anywhere in `docs/` (including `docs/contributing/`). CI and config
@@ -75,9 +84,9 @@ Keep diagrams selective. Add one only where visual structure beats prose:
   - Dark: ink `#e6edf3`, muted `#9198a1`, box `#0d1117` / stroke `#3d444d`,
     accent `#152042` / stroke `#6e8cf0`.
 - **Visual verification:** render both `-light.svg` and `-dark.svg` to PNG on
-  light and dark backgrounds and inspect the images before finishing. Confirm
-  zero text clipping, zero overlapping labels or arrows, and clear contrast in
-  both themes.
+  light (`#ffffff`) and dark (`#0d1117`) backgrounds and visually inspect the
+  images before finishing. Confirm zero text clipping, zero overlapping labels
+  or arrows, and clear contrast in both themes.
 
 ## Check before finishing
 

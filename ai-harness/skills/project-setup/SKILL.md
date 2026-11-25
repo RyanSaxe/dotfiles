@@ -274,14 +274,14 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 
 ## Docs
 
-Follow `write-well` and `$DOTFILES/ai-harness/references/documentation.md` when
-writing or revising docs:
+Follow the `repo-docs` and `write-well` skills when writing or revising docs:
 
 - **README as intro and hook:** sell the project in about one screen, with a
   sharp upfront pitch that piques interest, a high-level architecture diagram
-  or visual, a fast quick start, links into `docs/` instead of duplicating
-  manuals, and the license. Keep prose concise: never a dry stub and never a
-  bloated wall of text. A feature gets no section of its own.
+  or visual, a fast quick start and links into `docs/` instead of duplicating
+  manuals. Keep a root `LICENSE` file rather than a redundant `## License` stub
+  in the README. Keep prose concise: never a dry stub and never a bloated wall
+  of text. A feature gets no section of its own.
   [pair's README](https://github.com/RyanSaxe/pair#readme) follows this layout.
 - **Diagrams as light/dark `<picture>` SVGs:** commit `-light.svg` and
   `-dark.svg` pairs inside `<picture>` (`<source media="(prefers-color-scheme: dark)" srcset="..."><img ...>`)
@@ -330,9 +330,8 @@ writing or revising docs:
 4. Copy the templates for the detected stacks, stage everything with `git add`
    (since prek checks tracked files), run `prek install`, then
    `prek run --all-files` until it passes, then run the tests. Commit.
-5. Write the README's tagline, Get started and license (add pictures, diagrams
-   and docs links once there is something to show) and write `AGENTS.md`.
-   Commit.
+5. Write the README's opening pitch and quick start (add pictures, diagrams and
+   docs links once there is something to show) and write `AGENTS.md`. Commit.
 6. For a project that ships, write `release.yml` and commit it.
 7. Open a pull request into the default branch.
 
