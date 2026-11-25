@@ -47,68 +47,66 @@ Claude and Antigravity read the instructions live through the import and link.
 Codex has no import, so it gets them at the next `home-switch`.
 
 A Mac switch writes `/etc/codex`, where Codex reads its managed hooks. Home
-Manager can't write to `/etc`, so on Linux the home switch puts the same
-files in `~/.config/codex/managed`, and `/etc/codex` is a link to that
-folder, made once by hand. `modules/codex-managed.nix` lists the files for
-both.
+Manager can't write to `/etc`, so on Linux the home switch puts the same files
+in `~/.config/codex/managed`, and `/etc/codex` is a link to that folder, made
+once by hand. `modules/codex-managed.nix` lists the files for both.
 
 Most skills come from a private catalog, which installs them into
 `~/.agents/skills`, the folder Codex reads. Claude Code reads only
 `~/.claude/skills` and Antigravity CLI reads `~/.gemini/config/skills`, so on
-computers with the `personal` role `tools/link-agent-skills.sh` links each
-skill into both. Each home switch runs it once, and on a Mac a launchd agent
-also runs it whenever `~/.agents/skills` changes. The catalog's agents land
-only in `~/.codex/agents`, so `tools/convert-codex-agents.py` writes a Claude
-agent in `~/.claude/agents` and an Antigravity agent in
-`~/.gemini/config/agents` for each one, at each home switch and, on a Mac,
-whenever that folder changes. Other tools install their own skills: pair's
-comes from pair's own `npx skills add RyanSaxe/pair -g`, which each home
-switch runs when the skill is missing, and byor and Rex install theirs.
+computers with the `personal` role `tools/link-agent-skills.sh` links each skill
+into both. Each home switch runs it once, and on a Mac a launchd agent also runs
+it whenever `~/.agents/skills` changes. The catalog's agents land only in
+`~/.codex/agents`, so `tools/convert-codex-agents.py` writes a Claude agent in
+`~/.claude/agents` and an Antigravity agent in `~/.gemini/config/agents` for
+each one, at each home switch and, on a Mac, whenever that folder changes. Other
+tools install their own skills: pair's comes from pair's own
+`npx skills add RyanSaxe/pair -g`, which each home switch runs when the skill is
+missing, and byor and Rex install theirs.
 
-Every computer also gets Copilot CLI, and a computer with the `personal`
-role gets pi and Antigravity CLI too. pair's hub can wake Copilot CLI, pi and
+Every computer also gets Copilot CLI, and a computer with the `personal` role
+gets pi and Antigravity CLI too. pair's hub can wake Copilot CLI, pi and
 Antigravity CLI, as it wakes Claude Code and Codex. Copilot CLI and pi read
-pair's skill from `~/.agents/skills`, as Codex does, and Antigravity CLI gets
-it through `tools/link-agent-skills.sh`. Each home switch registers pair's pi
+pair's skill from `~/.agents/skills`, as Codex does, and Antigravity CLI gets it
+through `tools/link-agent-skills.sh`. Each home switch registers pair's pi
 extension from `~/.nix-profile`, a path that stays the same when pair updates.
 The `copilot` alias starts Copilot CLI with its UI server and access to pair's
 state folder, which pair needs.
 
-Each Claude Code, Codex, Copilot and Antigravity CLI session registers with
-pair as it starts, so `pair agents` lists it and other agents can message it.
-Each home switch adds `pair register --hook` to Claude Code's `SessionStart`
-list beside Rex's, to `~/.copilot/hooks/pair.json`, and to Antigravity CLI's
+Each Claude Code, Codex, Copilot and Antigravity CLI session registers with pair
+as it starts, so `pair agents` lists it and other agents can message it. Each
+home switch adds `pair register --hook` to Claude Code's `SessionStart` list
+beside Rex's, to `~/.copilot/hooks/pair.json`, and to Antigravity CLI's
 `PreInvocation` hook in `~/.gemini/config/hooks.json`. Codex runs
 `tools/pair-register.sh` as a managed hook.
 
-Each agent's settings live in `modules/home/agents.nix`. Each home switch
-merges them into `~/.claude/settings.json`, `~/.codex/config.toml` and
+Each agent's settings live in `modules/home/agents.nix`. Each home switch merges
+them into `~/.claude/settings.json`, `~/.codex/config.toml` and
 `~/.gemini/antigravity-cli/settings.json`, keeping whatever the agent wrote
 there itself. Deleting a setting from the module leaves it in the file, so
 delete it there by hand too.
 
 Rex and tmux take ctrl+k and alt+s before Antigravity CLI sees them, so each
 home switch also merges two key bindings into
-`~/.gemini/antigravity-cli/keybindings.json`: alt+k approves a waiting
-subagent, and alt+b opens the swarm board.
+`~/.gemini/antigravity-cli/keybindings.json`: alt+k approves a waiting subagent,
+and alt+b opens the swarm board.
 
 ## Phone notifications
 
 `tools/notify-pushover.zsh` sends a [Pushover](https://pushover.net) push when
-an agent finishes a turn, asks for permission or a question, or fails. The
-title names the project, the agent and the event, and the message is the
-agent's last message or what it is asking for. Claude Code calls it from its
-`Stop`, `Notification` and `StopFailure` hooks, Codex from the managed
-`Stop` and `PermissionRequest` hooks in `codex/requirements.toml`, and
-Antigravity CLI from its `Stop` hook in `~/.gemini/config/hooks.json`.
+an agent finishes a turn, asks for permission or a question, or fails. The title
+names the project, the agent and the event, and the message is the agent's last
+message or what it is asking for. Claude Code calls it from its `Stop`,
+`Notification` and `StopFailure` hooks, Codex from the managed `Stop` and
+`PermissionRequest` hooks in `codex/requirements.toml`, and Antigravity CLI from
+its `Stop` hook in `~/.gemini/config/hooks.json`.
 
 The script takes its two keys from the first place that has them:
-`PUSHOVER_USER` and `PUSHOVER_TOKEN` in the environment, then
-`pushover-user` and `pushover-token` in `~/.config/sops-nix/secrets`, which
-each home switch decrypts from `secrets/secrets.yaml`, then the login
-keychain. On macOS it sends nothing if the keyboard or mouse was used in the
-last 60 seconds, and `PUSHOVER_IDLE` sets a different number of seconds. To
-send a test push:
+`PUSHOVER_USER` and `PUSHOVER_TOKEN` in the environment, then `pushover-user`
+and `pushover-token` in `~/.config/sops-nix/secrets`, which each home switch
+decrypts from `secrets/secrets.yaml`, then the login keychain. On macOS it sends
+nothing if the keyboard or mouse was used in the last 60 seconds, and
+`PUSHOVER_IDLE` sets a different number of seconds. To send a test push:
 
 ```sh
 echo '{"hook_event_name": "Stop", "last_assistant_message": "test"}' |
@@ -135,7 +133,7 @@ When each agent rang, in a tmux session no client showed, with Claude Code
 | Claude Code | about a minute after it ends | about 6 seconds after it shows | about 6 seconds after it shows |
 | Codex       | as it ends                   | as it shows                    | as it shows                    |
 
-Claude Code rings for a finished turn only once its prompt has sat idle for
-a minute, so a turn you watched end still needs you if you switch away
-within that minute. A Codex plan-mode prompt rings with the turn it ends,
-and a Codex `request_permissions` prompt rings nothing.
+Claude Code rings for a finished turn only once its prompt has sat idle for a
+minute, so a turn you watched end still needs you if you switch away within that
+minute. A Codex plan-mode prompt rings with the turn it ends, and a Codex
+`request_permissions` prompt rings nothing.

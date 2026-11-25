@@ -97,8 +97,8 @@ git push
 
 `home-switch` clones the Markdown notes vault into `~/generic/vault` over SSH
 when the directory is missing. If this machine's SSH key is not on GitHub yet,
-the switch logs a notice and finishes the rest; re-run `home-switch` after adding
-the key.
+the switch logs a notice and finishes the rest; re-run `home-switch` after
+adding the key.
 
 ## After the first switches
 

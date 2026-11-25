@@ -8,9 +8,10 @@ One-time steps that switches cannot automate. Run these once per machine after
 1. Load the theme: open `chrome://extensions`, enable Developer mode, click
    **Load unpacked**, and select `~/.config/theme/chrome` (`Cmd-Shift-G` lets
    you type the path).
-2. Open `chrome://settings/onStartup` and choose **Continue where you left
-   off**. Chrome loads themes only at startup, so `theme` restarts Chrome on
-   light/dark switches; this setting restores your windows and tabs.
+2. Open `chrome://settings/onStartup` and choose
+   **Continue where you left off**. Chrome loads themes only at startup, so
+   `theme` restarts Chrome on light/dark switches; this setting restores your
+   windows and tabs.
 
 ## The agents
 
