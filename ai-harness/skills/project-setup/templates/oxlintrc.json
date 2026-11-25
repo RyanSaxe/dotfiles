@@ -1,8 +1,10 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   // Add "react" and "jsx-a11y" for React repos; drop "typescript" and the
-  // `typescript/*` rules below for pure JS repos. CLI entrypoints may opt out
-  // of `no-console` where stdout/stderr logging is the interface.
+  // `typescript/*` rules below for pure JS repos, and drop the React
+  // `no-restricted-imports` rule and `overrides` block for non-React repos.
+  // CLI entrypoints may opt out of `no-console` where stdout/stderr logging
+  // is the interface.
   "plugins": ["typescript", "unicorn", "oxc", "import"],
   "categories": {
     "correctness": "error",
@@ -35,6 +37,30 @@
     // Cover every member of a discriminated union in switch statements.
     "typescript/switch-exhaustiveness-check": "error",
     "typescript/no-misused-promises": "error",
-    "typescript/explicit-function-return-type": "error"
-  }
+    "typescript/explicit-function-return-type": "error",
+    // React repos: ban direct `useEffect` / `useLayoutEffect` imports in
+    // product UI; drop this rule and `overrides` below in non-React repos.
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react",
+            "importNames": ["useEffect", "useLayoutEffect"],
+            "message": "Derive state during render, handle side effects in event handlers, or encapsulate external-system sync in a custom hook under hooks/."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      // React repos: allow `useEffect` / `useLayoutEffect` only inside the
+      // designated primitive layer (`**/hooks/**` by default).
+      "files": ["**/hooks/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }
