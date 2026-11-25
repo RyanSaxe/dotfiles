@@ -30,13 +30,10 @@ jobs:
       - uses: DeterminateSystems/determinate-nix-action@v3
       - uses: astral-sh/setup-uv@v10.4.0
 
-      - name: prek
-        # The query check needs Neovim's plugins and parsers, which only a
-        # computer that runs Neovim has.
-        env:
-          SKIP: nvim-queries
+      - name: Install check tools
         run: |
           tools=$(nix build --no-link --print-out-paths --inputs-from . \
+            nixpkgs#ast-grep \
             nixpkgs#stylua \
             nixpkgs#emmylua-check \
             nixpkgs#luaPackages.luacheck \
@@ -48,7 +45,17 @@ jobs:
             nixpkgs#go \
             nixpkgs#golangci-lint \
             | sed 's|$|/bin|' | paste -sd: -)
-          PATH="$tools:$PATH" uvx prek run --all-files --show-diff-on-failure
+          echo "$tools" | tr ':' '\n' >> "$GITHUB_PATH"
+
+      - name: prek
+        # The query check needs Neovim's plugins and parsers, which only a
+        # computer that runs Neovim has.
+        env:
+          SKIP: nvim-queries
+        run: uvx prek@0.5.11 run --all-files --show-diff-on-failure
+
+      - name: pytest
+        run: uv run --no-project --with pytest --with byor pytest -v tests/
 
       # The store cache holds the paths in the configs that have no
       # cache.nixos.org signature: mostly what the build made itself, such as

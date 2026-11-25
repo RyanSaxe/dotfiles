@@ -172,11 +172,13 @@ repo. It takes this checkout as input `dotfiles`, stores its own `host.nix` and
   `home-switch` builds `ACCOUNT@work`. Linux hosts define only
   `homeConfigurations` with `system = "x86_64-linux"`, `/home` paths and no
   `gui` role.
+
 - `flake` points the switches and `nix-update` at the private flake. The
   switches override the `dotfiles` input with the local checkout (including
   uncommitted edits), so the input must be named `dotfiles`. `?ref=main` lets
   Nix lock a dirty checkout; `nix-update` updates the private lock while keeping
   shared inputs pinned to this repo's `flake.lock`.
+
 - `secretsFile` needs `pushover-user`, `pushover-token`, and a host entry (here
   `work`) under `pair-hub-host`, `attention-watch` and `attention-ignore`
   (unused values may be empty). Add a `.sops.yaml` beside it:

@@ -297,18 +297,22 @@ Follow the `repo-docs` and `write-well` skills when writing or revising docs:
   `docs/`. Keep a root `LICENSE` file instead of a redundant `## License`
   section in the README. A feature gets no section of its own.
   [pair's README](https://github.com/RyanSaxe/pair#readme) follows this layout.
+
 - **Diagrams:** commit `-light.svg` and `-dark.svg` pairs inside `<picture>`
   instead of fenced `mermaid` blocks, which GitHub's mobile apps show as raw
   code. Add a diagram only where it helps, use the system font stack with
   `role="img"` and `aria-label`, and inspect rendered PNGs in both light and
   dark modes.
+
 - **No qualifiers or filler:** no list of platforms when every platform works,
   no status banners, and no features that do not exist yet.
+
 - **Diátaxis in `docs/`:** for multi-page docs, organize under
   `docs/getting-started/`, `docs/guides/`, `docs/concepts/`, `docs/reference/`
   and `docs/contributing/` when needed, with `docs/README.md` as the index and
   images in `assets/` or `docs/assets/`. Skip unused directories instead of
   adding empty stubs.
+
 - **README vs `AGENTS.md`:** the README is for using the project, and
   `AGENTS.md` is for changing it. `AGENTS.md` has:
   - the setup, the modules, and the project's own rules for the code and the
@@ -322,8 +326,10 @@ Follow the `repo-docs` and `write-well` skills when writing or revising docs:
 
   Do not put prose rules in `AGENTS.md` that linters or hooks already enforce,
   and do not add a rule-to-enforcer table.
+
 - Planned work that has not started goes in a committed `BACKLOG.md`, and the
   pull request that does an entry removes it.
+
 - Skills for working on this repository go in `.agents/skills/NAME/SKILL.md`.
 
 ## Mode 1: New project
