@@ -73,8 +73,10 @@ or fight each other:
   requiring BYOR on runners.
 - **BYOR** owns the agent edit loop (`--no-gate`, never `gate: true`). Wire
   every project with the `craft` package plus its stack package when one exists
-  (`python` or `web`). The old `style` package is retired; replace it with
-  `craft` plus the stack package.
+  (`python` or `web`). Pass `--non-interactive --no-register` when running
+  `byor init` in a worktree or automated session so it never blocks on prompts
+  or registers a temporary checkout. The old `style` package is retired; replace
+  it with `craft` plus the stack package.
 
 ## Cross-language parity standard
 
@@ -133,11 +135,15 @@ For a package or an app:
    `max-positional-args = 2`), bans relative imports, and bans `typing.cast`,
    `typing_extensions.cast`, `unittest`, `unittest.mock` and dynamic `importlib`
    APIs via `TID251`. Give each ignore you add a comment of its own.
-4. Run `byor init --packages craft python --no-gate`.
+4. Run `byor init --no-gate --non-interactive --no-register --packages craft python`.
 
-Ruff formats and lints with `--fix`, and `ty` checks types. A project needs no
-other Python linter or type checker. Notebooks are committed without their
-outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
+Ruff formats and lints with `--fix`, and `ty` checks types. When a project uses
+optional uv dependency groups (`--group ...`) or lives in a subdirectory
+(`--directory ...`), use a local `uv run --locked ... ty check` hook instead of
+`ty-pre-commit`, because `ty-pre-commit` runs in an isolated venv that cannot
+see those environments. A project needs no other Python linter or type checker.
+Notebooks are committed without their outputs, which `nbstripout` removes, and
+Ruff and `ty` check them too.
 
 ## Web and Node
 
@@ -180,7 +186,7 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 - A framework's file type, such as `.astro`, goes in the `files` pattern of each
   web hook. `oxfmt` skips the type unless `.oxfmtrc.json` turns it on, as
   `"astro": true` does.
-- Run `byor init --packages craft web --no-gate`.
+- Run `byor init --no-gate --non-interactive --no-register --packages craft web`.
 
 ## Rust
 
@@ -192,7 +198,7 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
   `expect_used`. Add `cognitive-complexity-threshold = 15` in `clippy.toml`.
 - Run `cargo test --locked` in CI. For shipped crates, consider adding
   `cargo machete` or `cargo deny check` to the CI `test` job.
-- Run `byor init --package craft --no-gate`.
+- Run `byor init --no-gate --non-interactive --no-register --package craft`.
 
 ## Go
 
@@ -207,7 +213,7 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
   runs `go test -race ./...`.
 - For a tiny single-package helper where `.golangci.yml` is overkill, use
   `gofmt -w` and `go vet ./...` instead.
-- Run `byor init --package craft --no-gate`.
+- Run `byor init --no-gate --non-interactive --no-register --package craft`.
 
 ## Lua
 
@@ -219,7 +225,7 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
   `luacheck --no-config --only 561 --max-cyclomatic-complexity 10` (complexity
   only; skip `selene` and full `luacheck` static analysis). Add `busted` or
   `nvim --clean --headless` test commands to the CI `test` job when tests exist.
-- Run `byor init --package craft --no-gate`.
+- Run `byor init --no-gate --non-interactive --no-register --package craft`.
 
 ## Shell
 
@@ -327,9 +333,9 @@ Follow the `repo-docs` and `write-well` skills when writing or revising docs:
    branch, push develop at the same commit and make it the default with
    `gh repo edit --default-branch develop`. Build the rest on a branch from the
    default branch.
-3. Set up each stack's toolchain, `.gitignore` and BYOR (`--no-gate` with
-   `craft` plus stack packages). Put the license in `pyproject.toml`,
-   `package.json` or `Cargo.toml`. Commit.
+3. Set up each stack's toolchain, `.gitignore` and BYOR (`--no-gate
+   --non-interactive --no-register` with `craft` plus stack packages). Put the
+   license in `pyproject.toml`, `package.json` or `Cargo.toml`. Commit.
 4. Copy the templates for the detected stacks, stage everything with `git add`
    (since prek checks tracked files), run `prek install`, then
    `prek run --all-files` until it passes, then run the tests. Commit.
@@ -362,18 +368,19 @@ Use this mode for any existing repository.
    that rule out of the cleanup pull request and record a dedicated follow-up
    item in `BACKLOG.md`.
 
-4. Land all approved changes on one branch in one pull request, using four
-   ordered atomic commits:
+4. Land all approved changes on one branch using four ordered atomic commits:
    1. **Migrate tooling and wire BYOR:** convert and delete legacy tooling
       configs, dependencies and hooks (Prettier, ESLint, Husky, lint-staged,
       Biome, markdownlint, Black, isort, Flake8, pylint, mypy, pyright,
       `.luacheckrc` / `selene`, Python `pre-commit`, Dependabot/Renovate).
-      Install the canonical tools and wire BYOR with `--no-gate` and `craft`
-      plus the stack packages.
+      Install the canonical tools and wire BYOR with `--no-gate
+      --non-interactive --no-register` and `craft` plus the stack packages.
    2. **Pure reformat:** run only the formatters (`prek run` formatter hooks or
-      the formatters directly) with no logic edits. When the repository
-      preserves commit history, record this commit's SHA in
-      `.git-blame-ignore-revs`.
+      the formatters directly) with no logic edits. When a repository already
+      has active pre-commit hooks, keep the pure reformat ahead of enabling
+      strict lint checks so pre-commit hooks do not reject the reformat commit
+      on pre-existing lint findings. When the repository preserves commit
+      history, record this commit's SHA in `.git-blame-ignore-revs`.
    3. **Fix findings:** fix every remaining lint, type and 1,000-line file-cap
       finding cleanly so `prek run --all-files`, `byor agent-check` and all
       tests pass.
@@ -382,6 +389,12 @@ Use this mode for any existing repository.
       now enforce, with no rule-to-enforcer table), fill approved README/docs
       gaps, and update branch ruleset required check names and any
       `workflow_run` triggers when workflow or job names change.
+
+5. **User simulation:** before opening the pull request, exercise the repository
+   at every affected interface as a real user would — run the built app, CLI,
+   site or generated output and verify visual and runtime parity against the
+   base branch rather than relying on unit tests alone — to confirm no
+   behavioral changes slipped in. Then open the pull request.
 
 ### Migrating off Prettier, ESLint and markdownlint
 
