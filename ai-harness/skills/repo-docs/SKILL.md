@@ -13,8 +13,8 @@ when writing or revising prose.
 
 A README is the front door to the repository:
 
-1. **What it is:** one or two plain sentences saying what the project does and
-   why it exists.
+1. **The hook:** one or two concrete sentences naming the problem it solves and
+   what makes the approach interesting, without hype.
 2. **Overview visual:** a screenshot, recording or architecture diagram showing
    how it fits together.
 3. **Quick start:** the minimal commands or code to try it.
