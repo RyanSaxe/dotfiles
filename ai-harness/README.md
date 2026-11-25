@@ -20,7 +20,7 @@ ai-harness/
 ├── AGENTS.md         global instructions
 ├── references/       what AGENTS.md says to read before writing code
 │                     or tests, or checking work
-├── skills/           Agent Skills: worktrees, wiki and project-setup
+├── skills/           Agent Skills: worktrees, wiki, project-setup and repo-docs
 ├── tools/            notify-pushover.zsh, the agents' push hook,
 │                     link-agent-skills.sh, which shares Codex's skills
 │                     with Claude Code and Antigravity CLI, and

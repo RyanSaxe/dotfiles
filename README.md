@@ -1,48 +1,43 @@
 # dotfiles
 
-These are my dotfiles: one Nix flake that sets up my Mac and a Linux server,
-from macOS's settings to my editor.
+One Nix flake that configures a Mac and a Linux server from macOS defaults to
+Neovim, with a live Catppuccin light/dark theme and `ws`, a worktree-and-agent
+workspace manager.
 
 <img alt="The Mac's screen: sketchybar across the top, and Rex below it with two Neovim panes. The focused one has a Python file, and the other a note with its Mermaid diagram and formula drawn as pictures." src="assets/screen.png">
 
 ## How it works
 
-- Each computer has a file in `hosts/` that lists its roles, such as `gui`
-  for a computer with a screen or `personal` for one that isn't for work.
-  Each module applies only to computers with the roles it names, so one
-  flake can set up different computers.
-- Most files under `config/` and `ai-harness/` are links into this
-  checkout, so a program picks up an edit the next time it starts. Any other
-  change needs a rebuild, which the commands below run.
-- `ws`, a Go program in `pkgs/ws`, opens each folder, worktree and pull
-  request in Rex with an agent in it, a worktree as a tab of its project's
-  session. You switch between them with its popups, listed below.
-- In `theme/meanings.nix`, each use of color, such as `error` or `muted`,
-  has a Catppuccin color. Every app's colors are generated from that file in
-  light and dark mode, so changing `error` there changes it everywhere.
+- **Role-based hosts:** each machine has a file in `hosts/` listing its roles
+  (`base`, `gui`, `personal`, `rex-server`). Modules enable themselves by role,
+  so one flake builds Macs, Linux boxes and private work hosts.
+- **Live-linked config:** most files in `config/` and `ai-harness/` symlink into
+  this checkout, so edits apply on next start or reload. Everything else updates
+  through a switch.
+- **Worktrees and agents (`ws`):** a Go tool in `pkgs/ws` opens folders,
+  worktrees and pull requests in Rex or tmux with an agent ready, plus fuzzy
+  popups for switching, diffs, GitHub reviews and vault tasks.
+- **Semantic Catppuccin theme:** `theme/meanings.nix` maps color roles (such as
+  `error` or `muted`) to Catppuccin Latte and Mocha. Every app's colors generate
+  from that single file, and `theme light`/`theme dark` switches them live.
 
 ## Commands
 
 ```sh
-home-switch     # rebuild the tools and their config, on the Mac or Linux
-mac-switch      # apply macOS's settings and Homebrew apps (asks for a password)
-nix-update      # update the flake's inputs, rebuild, and upgrade uv's tools
+home-switch     # rebuild tools and config (Mac or Linux, no password)
+mac-switch      # apply macOS settings, Homebrew casks and /etc (asks for password)
+nix-update      # update flake inputs, run switches and upgrade uv tools
 theme dark      # switch macOS and every app to dark, or to light
-ws new NAME     # make a worktree on branch NAME and start an agent in it
-ws pr NUMBER    # check a pull request out into its own worktree
-ws project REPO # clone a GitHub repository, or make a new project, and open it
+ws new NAME     # create a worktree on branch NAME and start an agent in it
+ws pr NUMBER    # check out a pull request in its own worktree
+ws project REPO # clone a GitHub repo or initialize a new project, and open it
 ws rm NAME      # close a worktree's tab, remove it and delete its branch
 ```
 
-[docs/ws.md](docs/ws.md) has the other `ws` commands, and `ws --help` lists them
-all.
+Most edits need only `home-switch`. See [docs/ws.md](docs/ws.md) or `ws --help`
+for all `ws` commands.
 
-Most changes need only `home-switch`. It changes only files in your home
-folder, so it doesn't need your password. `mac-switch` changes macOS's
-settings, the Homebrew apps and files in `/etc`, so it asks for your password.
-`nix-update` runs both.
-
-In Rex or tmux, these keys open a `ws` popup:
+### `ws` popups (Rex and tmux)
 
 | Key          | Popup                                                          |
 | ------------ | -------------------------------------------------------------- |
@@ -51,17 +46,19 @@ In Rex or tmux, these keys open a `ws` popup:
 | Alt-S        | Go, on Sessions: each session and worktree tab                 |
 | Alt-A        | Go, on Agents: every running agent, newest report first        |
 | Ctrl-F in Go | Files: the selected folder's files, to open in Neovim          |
-| Alt-R        | Inbox, on Needs you: the pull requests and issues that do      |
-| Alt-T        | Inbox, on its Tasks tabs: the open tasks in your notes         |
-| Alt-C        | Theme: switch light and dark, and pick the picture in popups   |
+| Alt-R        | Inbox, on Needs you: pull requests and issues needing action   |
+| Alt-T        | Inbox, on Tasks: open tasks in your vault                      |
+| Alt-C        | Theme: switch light and dark, and pick the popup mascot        |
 | Alt-/        | Keys: every key binding                                        |
 
 <img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on the one that has a running session and a bookmarked folder last, beside the selected worktree's branch, top-level folders and files, and recent commits." src="assets/picker.png">
 
 <img alt="The Inbox popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description. The tabs after it list your pull requests, your issues, what is new in watched repositories, and your open tasks." src="assets/inbox.png">
 
-At the left of sketchybar, after the date, are AeroSpace's four workspaces,
-with the focused one in the accent color:
+### Workspaces and attention indicators (macOS)
+
+AeroSpace workspaces sit on the left of sketchybar (add `Shift` to move the
+focused window):
 
 | Key       | Workspace |
 | --------- | --------- |
@@ -70,30 +67,24 @@ with the focused one in the accent color:
 | Cmd-Alt-N | Code      |
 | Cmd-Alt-M | Meetings  |
 
-Add Shift to the key to move the focused window to that workspace.
+Next to them, three letters light up when something needs attention; press
+`Cmd-Alt` + letter from any app to jump straight there:
 
-After them are three letters that light up when something needs you. From any
-app, press Cmd-Alt and the letter to act on it:
-
-| Letter | Lights up when                                               | Cmd-Alt and the letter |
-| ------ | ------------------------------------------------------------ | ---------------------- |
-| A      | An agent has failed, is blocked or finished since you looked | Go to that agent       |
-| R      | A pull request or issue is in the Inbox's Needs you tab      | Open the Inbox on it   |
-| T      | A task is due by tomorrow                                    | Open the Inbox's tasks |
-
-The A lights red while a failed agent needs you, peach while a blocked one
-does, and green while only finished ones do. Cmd-Alt-A goes to failed
-agents first, then blocked ones, then finished ones.
+| Letter | Lights up when                                              | Cmd-Alt + letter     |
+| ------ | ----------------------------------------------------------- | -------------------- |
+| A      | An agent failed (red), is blocked (peach) or finished (green) | Jump to that agent (failed → blocked → finished) |
+| R      | A pull request or issue sits in Inbox → Needs you           | Open Inbox on it     |
+| T      | A vault task is due by tomorrow                             | Open Inbox on tasks  |
 
 ## Documentation
 
-| Page                               | Contents                                                    |
-| ---------------------------------- | ----------------------------------------------------------- |
-| [Setup](docs/setup.md)             | Setting up a new Mac or Linux machine                       |
-| [By hand](docs/manual.md)          | What each computer needs once after setup                   |
-| [Layout](docs/layout.md)           | Hosts, roles, modules and where each file is                |
-| [ws](docs/ws.md)                   | ws's commands, layouts and popups, and the state it saves   |
-| [Theme](docs/theme.md)             | Light and dark, and coloring another app                    |
-| [AGENTS.md](AGENTS.md)             | Which rebuild each change needs, the checks and the rules   |
-| [AI harness](ai-harness/README.md) | The agents' instructions, skills, settings and phone alerts |
-| [LATER.md](LATER.md)               | What the setup doesn't do yet                               |
+| Page                               | Contents                                                  |
+| ---------------------------------- | --------------------------------------------------------- |
+| [Setup](docs/setup.md)             | Bootstrapping a new Mac, Linux box or private work flake  |
+| [By hand](docs/manual.md)          | One-time manual steps after setup                         |
+| [Layout](docs/layout.md)           | Hosts, roles, modules and directory map                   |
+| [ws](docs/ws.md)                   | `ws` commands, places, layouts, popups and saved state    |
+| [Theme](docs/theme.md)             | Light/dark switching and theming another app              |
+| [AGENTS.md](AGENTS.md)             | Rebuild rules, checks and repository conventions          |
+| [AI harness](ai-harness/README.md) | Global agent instructions, skills, hooks and phone alerts |
+| [LATER.md](LATER.md)               | Items still manual or deferred                            |

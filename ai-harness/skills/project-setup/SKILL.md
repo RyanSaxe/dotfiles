@@ -274,19 +274,27 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 
 ## Docs
 
-- The README sells the project to developers in one screen: a tagline, a picture
-  or a video, Get started, How it works with one diagram, links to the docs, and
-  the license. A feature gets no section of its own.
+Follow the `repo-docs` and `write-well` skills when writing or revising docs:
+
+- **README:** introduce the project in about one screen: what it does and why
+  it exists, an overview visual or diagram, a minimal quick start and links to
+  `docs/`. Keep a root `LICENSE` file instead of a redundant `## License`
+  section in the README. A feature gets no section of its own.
   [pair's README](https://github.com/RyanSaxe/pair#readme) follows this layout.
-- A diagram is a custom SVG with a light and a dark version in a `<picture>`,
-  never Mermaid. Add an image only where it helps.
-- Leave out qualifiers and filler: no list of platforms when every platform
-  works, no status banners, and no features that do not exist yet.
-- Longer docs go in `docs/`, in `getting-started/`, `concepts/`, `guides/`,
-  `reference/` and `contributing/`, with `docs/README.md` as the index and
-  images in `docs/assets/`.
-- The README is for using the project, and `AGENTS.md` is for changing it.
-  `AGENTS.md` has:
+- **Diagrams:** commit `-light.svg` and `-dark.svg` pairs inside `<picture>`
+  instead of fenced `mermaid` blocks, which GitHub's mobile apps show as raw
+  code. Add a diagram only where it helps, use the system font stack with
+  `role="img"` and `aria-label`, and inspect rendered PNGs in both light and
+  dark modes.
+- **No qualifiers or filler:** no list of platforms when every platform works,
+  no status banners, and no features that do not exist yet.
+- **Diátaxis in `docs/`:** for multi-page docs, organize under
+  `docs/getting-started/`, `docs/guides/`, `docs/concepts/`, `docs/reference/`
+  and `docs/contributing/` when needed, with `docs/README.md` as the index and
+  images in `assets/` or `docs/assets/`. Skip unused directories instead of
+  adding empty stubs.
+- **README vs `AGENTS.md`:** the README is for using the project, and
+  `AGENTS.md` is for changing it. `AGENTS.md` has:
   - the setup, the modules, and the project's own rules for the code and the
     tests
   - the exact check commands
@@ -317,9 +325,8 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 4. Copy the templates for the detected stacks, stage everything with `git add`
    (since prek checks tracked files), run `prek install`, then
    `prek run --all-files` until it passes, then run the tests. Commit.
-5. Write the README's tagline, Get started and license (add pictures, diagrams
-   and docs links once there is something to show) and write `AGENTS.md`.
-   Commit.
+5. Write the README's overview and quick start (add pictures, diagrams and
+   docs links once there is something to show) and write `AGENTS.md`. Commit.
 6. For a project that ships, write `release.yml` and commit it.
 7. Open a pull request into the default branch.
 

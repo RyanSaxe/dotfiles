@@ -1,25 +1,22 @@
 # Setup
 
-Each computer keeps its checkout at `~/generic/dotfiles`, where its host
-file expects it. These steps set up the two computers `flake.nix` lists,
-`mac` and `linux`.
+Clone this repository at `~/generic/dotfiles`, where every host file expects it.
+These steps bootstrap `mac` and `linux` from `flake.nix`.
 
 ## A Mac
 
-1. Install Nix and Homebrew, and Claude Code on a computer with the
-   `personal` role. The Mac switch installs apps through Homebrew but can't install
-   Homebrew itself. Claude Code goes before the first home switch, so that
-   the switch sets byor and pair up for it. The home switch installs
-   Antigravity CLI itself on a personal computer, from its official installer.
+1. Install Nix, Homebrew, and (on `personal` hosts) Claude Code before the first
+   switch so the switch can configure `byor` and `pair` for it. (`home-switch`
+   installs Antigravity CLI itself on `personal` hosts.)
 
    ```sh
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   curl -fsSL https://claude.ai/install.sh | bash   # only on a personal computer
+   curl -fsSL https://claude.ai/install.sh | bash   # personal hosts only
    ```
 
-2. In a new terminal, so that `nix` is on the PATH, clone the repository
-   and make the age key that opens the secrets:
+2. Open a new terminal (so `nix` is on `PATH`), clone the repo and generate the
+   age key for `sops`:
 
    ```sh
    nix run nixpkgs#git -- clone https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
@@ -29,8 +26,7 @@ file expects it. These steps set up the two computers `flake.nix` lists,
 
 3. [Encrypt the secrets to the new key](#encrypt-the-secrets-to-a-new-key).
 
-4. Pull, run the first switches and sign gh in to GitHub, which git and
-   the Inbox use:
+4. Pull, run the first switches and authenticate `gh` (used by git and Inbox):
 
    ```sh
    nix run nixpkgs#git -- -C ~/generic/dotfiles pull
@@ -39,32 +35,28 @@ file expects it. These steps set up the two computers `flake.nix` lists,
    gh auth login
    ```
 
-   `-b pre-nix` renames each file the home switch would replace, such as an
-   old `~/.zshrc`, to `NAME.pre-nix`. The home switch also
-   [clones the vault](#the-vault).
+   `-b pre-nix` backs up existing files (such as `~/.zshrc`) as `NAME.pre-nix`.
+   `home-switch` also [clones the vault](#the-vault).
 
-Rex, Tailscale and Google Chrome are still installed by hand, as
-[LATER.md](../LATER.md) says. [By hand](manual.md) lists what to do once
-after the switches: Chrome's theme and the agents' sign-ins.
+Rex, Tailscale and Google Chrome are installed manually (see
+[LATER.md](../LATER.md)). Finish with [By hand](manual.md) for Chrome's theme
+and agent logins.
 
 ## A Linux box
 
-There's no Linux machine yet, so CI builds its config on every push to keep it
-working until there is one.
+CI builds the Linux home config on every push to keep it working. Unlike a Mac,
+Linux uses Home Manager only: `home-switch` installs Codex from nixpkgs,
+Antigravity CLI from its official installer on `personal` hosts, and Rex's
+server as a systemd user service.
 
-The steps match the Mac's, without Homebrew or nix-darwin. The home switch
-installs Codex from nixpkgs, installs Antigravity CLI on a personal computer
-from its official installer, and runs Rex's server as a systemd user service.
-
-1. Install Nix, and Claude Code on a computer with the `personal` role so it
-   uses the same self-updating release as the Mac:
+1. Install Nix, and (on `personal` hosts) Claude Code:
 
    ```sh
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
-   curl -fsSL https://claude.ai/install.sh | bash   # only on a personal computer
+   curl -fsSL https://claude.ai/install.sh | bash   # personal hosts only
    ```
 
-2. In a new terminal, clone the repository and make the age key:
+2. Open a new terminal, clone the repo and generate the age key:
 
    ```sh
    nix run nixpkgs#git -- clone https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
@@ -74,27 +66,26 @@ from its official installer, and runs Rex's server as a systemd user service.
 
 3. [Encrypt the secrets to the new key](#encrypt-the-secrets-to-a-new-key).
 
-4. Pull, run the first home switch, then do once by hand what Home Manager
-   can't: change the login shell and write to `/etc`.
+4. Pull, run the first `home-switch`, then apply the one-time system steps Home
+   Manager cannot do:
 
    ```sh
    nix run nixpkgs#git -- -C ~/generic/dotfiles pull
    nix run home-manager/master -- switch -b pre-nix --flake ~/generic/dotfiles#ryansaxe@linux
    gh auth login
-   echo ~/.nix-profile/bin/zsh | sudo tee -a /etc/shells   # make zsh the login shell
-   sudo chsh -s ~/.nix-profile/bin/zsh "$USER"
-   sudo ln -sfn ~/.config/codex/managed /etc/codex          # give Codex its managed hooks
-   loginctl enable-linger                                   # keep Rex's server running while logged out
-   rex server status                                        # print the link that signs the server in to the tailnet
+   echo ~/.nix-profile/bin/zsh | sudo tee -a /etc/shells   # register zsh
+   sudo chsh -s ~/.nix-profile/bin/zsh "$USER"             # set login shell
+   sudo ln -sfn ~/.config/codex/managed /etc/codex         # Codex managed hooks
+   loginctl enable-linger                                  # keep Rex server running when logged out
+   rex server status                                       # print tailnet sign-in link
    ```
 
-   The home switch also [clones the vault](#the-vault).
+   `home-switch` also [clones the vault](#the-vault).
 
 ## Encrypt the secrets to a new key
 
-A new key can't open the secrets until they're encrypted to it.
-`age-keygen` prints the public key. On a computer whose key `.sops.yaml`
-already lists, add the new public key to `.sops.yaml`, then:
+`age-keygen` prints the new public key. On a machine already listed in
+`.sops.yaml`, add that public key to `.sops.yaml` and re-encrypt:
 
 ```sh
 sops updatekeys secrets/secrets.yaml
@@ -104,43 +95,38 @@ git push
 
 ## The vault
 
-The home switch clones the vault, the Markdown notes that Neovim and ws
-read, into `~/generic/vault` when that folder is missing. It clones from
-GitHub over ssh, so GitHub must accept this computer's ssh key. Until it
-does, the switch prints that it didn't clone the vault and finishes the
-rest. Run `home-switch` again once the key is on GitHub.
+`home-switch` clones the Markdown notes vault into `~/generic/vault` over SSH
+when the directory is missing. If this machine's SSH key is not on GitHub yet,
+the switch logs a notice and finishes the rest; re-run `home-switch` after adding
+the key.
 
 ## After the first switches
 
 ```sh
-home-switch   # apply a change to the home config
-mac-switch    # apply a change to macOS
-nix-update    # update the flake's inputs, run the switches, upgrade uv's tools and agy
+home-switch   # apply home config changes
+mac-switch    # apply macOS, Homebrew and /etc changes
+nix-update    # update flake inputs, run switches, upgrade uv tools and agy
 ```
 
-[AGENTS.md](../AGENTS.md#applying-a-change) says which change needs which
+See [AGENTS.md](../AGENTS.md#applying-a-change) for which files need which
 switch.
 
 ## Another computer
 
-A new computer needs its own host file in `hosts/`, an entry in
-`flake.nix`, and its own lines under `pair-hub-host`, `attention-watch` and
-`attention-ignore` in the secrets.
+Add a host file under `hosts/`, register it in `flake.nix`, and add host entries
+under `pair-hub-host`, `attention-watch` and `attention-ignore` in
+`secrets/secrets.yaml`.
 
-The host file's `vault` names the vault's folder and the git remote to
-clone it from. A computer without the vault leaves it out. It then has no
-`VAULT_DIR`, so Neovim skips obsidian.nvim and the Inbox's Tasks tab says the
-vault isn't set up.
-
-A computer whose details stay out of this repository is built from a
-private flake instead, as the next section shows.
+Set `vault` in the host file to clone and enable the vault; omit it to leave
+`$VAULT_DIR` unset (Neovim skips `obsidian.nvim` and the Inbox Tasks tab reports
+no vault). For machines whose details must stay private, use a private flake
+below.
 
 ## A computer built from a private flake
 
-A private flake keeps a computer's account name, email and own tools out of
-this public repository. It takes this checkout as an input, keeps the
-computer's host file and secrets beside its `flake.nix`, and builds the
-computer's configs with `lib.mac` and `lib.home`:
+A private flake keeps account names, emails and private tools out of this public
+repo. It takes this checkout as input `dotfiles`, stores its own `host.nix` and
+`secrets.yaml`, and calls `dotfiles.lib.mac` / `dotfiles.lib.home`:
 
 ```nix
 # flake.nix
@@ -173,7 +159,7 @@ computer's configs with `lib.mac` and `lib.home`:
     flake = "/Users/ACCOUNT/generic/work-dotfiles"; # this flake's folder
     git.email = "EMAIL";
     secretsFile = ./secrets.yaml;
-    desktopPicture = false; # its desktop picture is managed elsewhere
+    desktopPicture = false; # managed elsewhere
     vault = {
       dir = "/Users/ACCOUNT/generic/vault";
       remote = "git@github.com:GITHUB_ACCOUNT/vault.git";
@@ -182,53 +168,43 @@ computer's configs with `lib.mac` and `lib.home`:
 }
 ```
 
-`name` is the computer's name in both outputs, so `mac-switch` builds
-`work` and `home-switch` builds `ACCOUNT@work`. A Linux box has only the
-`homeConfigurations` entry, with `system = "x86_64-linux"`, paths under
-`/home` and no `gui` role.
+- `name` must match the output names so `mac-switch` builds `work` and
+  `home-switch` builds `ACCOUNT@work`. Linux hosts define only
+  `homeConfigurations` with `system = "x86_64-linux"`, `/home` paths and no
+  `gui` role.
+- `flake` points the switches and `nix-update` at the private flake. The
+  switches override the `dotfiles` input with the local checkout (including
+  uncommitted edits), so the input must be named `dotfiles`. `?ref=main` lets
+  Nix lock a dirty checkout; `nix-update` updates the private lock while keeping
+  shared inputs pinned to this repo's `flake.lock`.
+- `secretsFile` needs `pushover-user`, `pushover-token`, and a host entry (here
+  `work`) under `pair-hub-host`, `attention-watch` and `attention-ignore`
+  (unused values may be empty). Add a `.sops.yaml` beside it:
 
-`flake` points the switches and `nix-update` at the private flake. The
-switches pass this checkout to it as the input named `dotfiles`, so they
-build it as it is, uncommitted changes included, like a computer that
-`flake.nix` lists. The private flake must name the input `dotfiles`.
-`nix-update` updates the private flake's lock, and the other inputs, such
-as nixpkgs, stay where this repository's `flake.lock` pins them. The input
-names `main` because Nix won't lock a checkout with uncommitted changes
-otherwise.
+  ```yaml
+  # .sops.yaml
+  creation_rules:
+    - path_regex: secrets\.yaml$
+      age: AGE_PUBLIC_KEY
+  ```
 
-`secretsFile` is the private flake's own sops file. It needs
-`pushover-user` and `pushover-token`, and an entry named after the
-computer, here `work`, under `pair-hub-host`, `attention-watch` and
-`attention-ignore`. A value the computer doesn't use can be empty. A
-`.sops.yaml` beside it lists the age keys that open it:
+  Create it with `sops secrets.yaml`, then commit every file in the private
+  flake (Nix ignores untracked files).
 
-```yaml
-# .sops.yaml
-creation_rules:
-  - path_regex: secrets\.yaml$
-    age: AGE_PUBLIC_KEY
-```
-
-`sops secrets.yaml` then opens a new file in your editor and encrypts it
-when you save. Nix reads only the files git tracks in a flake's
-repository, so commit all of the private flake's files.
-
-Set the computer up as a Mac or a Linux box above, with the private flake
-in the folder `flake` names. Make its secrets file in place of encrypting
-this repository's, skip the Rex lines on a Linux box without the
-`rex-server` role, and run the first switches against the private flake:
+Bootstrap as a Mac or Linux box above, skipping the Rex steps on Linux hosts
+without `rex-server`, and run the first switches against the private flake:
 
 ```sh
 sudo nix run nix-darwin/master#darwin-rebuild -- switch --flake ~/generic/work-dotfiles#work
 nix run home-manager/master -- switch -b pre-nix --flake ~/generic/work-dotfiles#ACCOUNT@work
 ```
 
-An agent can follow this section on a new computer, and needs the person at
-the computer for these steps:
+### Steps that need a person at the keyboard
 
-- typing the password when the Nix installer and `mac-switch` run `sudo`;
-- `gh auth login`, then `gh ssh-key add ~/.ssh/id_ed25519.pub` so that
-  GitHub accepts the computer's ssh key, which cloning the vault needs;
-- the secret values: the Pushover keys, which `sops -d secrets/secrets.yaml`
-  shows on a computer that already has them, and the GitHub accounts that
-  the Inbox watches and ignores.
+An agent can automate the rest, but needs you for:
+
+- `sudo` passwords during the Nix installer and `mac-switch`;
+- `gh auth login` and `gh ssh-key add ~/.ssh/id_ed25519.pub` (needed to clone
+  the vault);
+- secret values: Pushover keys (`sops -d secrets/secrets.yaml` on an existing
+  host) and the GitHub accounts to watch/ignore in Inbox.

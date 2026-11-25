@@ -8,6 +8,7 @@ edit here applies at their next session.
 | [`worktrees`](worktrees/SKILL.md)         | Start, watch and remove worktree agents with `ws`, and message them with `pair`. |
 | [`wiki`](wiki/SKILL.md)                   | Decide what agents learn is worth a page, and write it.                          |
 | [`project-setup`](project-setup/SKILL.md) | Set up a repository's tools, checks and docs, or bring one in line.              |
+| [`repo-docs`](repo-docs/SKILL.md)         | Write, organize and diagram repository READMEs and `docs/` trees.                |
 
 Most other skills come from a private catalog, which installs them into
 `~/.agents/skills`. Each home switch runs pair's
