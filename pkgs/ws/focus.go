@@ -15,9 +15,9 @@ import (
 	"workspace/mux"
 )
 
-// AeroSpace's Cmd-Alt-A, T and R switch to the code workspace and run
-// `ws focus`, which brings the terminal onto it and acts there: Rex when it's
-// installed, and otherwise Ghostty on tmux.
+// AeroSpace's Cmd-Alt-A, T and R run `ws focus`, which checks what had focus,
+// switches to the code workspace, brings the terminal onto it and acts there:
+// Rex when it's installed, and otherwise Ghostty on tmux.
 
 const (
 	rexBundle     = "com.superlogical.rex"
@@ -44,22 +44,25 @@ func focus(what string) error {
 			return err
 		}
 	}
+	// Capture whether Rex already has focus before bringToCode focuses it, so
+	// jumping from another app does not suppress the session Rex shows behind it.
+	shown := focusedRex()
 	// AeroSpace and Rex answer separately, so Rex switches to what the key
 	// asked for while AeroSpace brings its window forward.
 	placed := make(chan error, 1)
 	go func() { placed <- bringToCode(rexBundle, ws) }()
-	err = focusRex(what, ws)
+	err = focusRex(what, shown)
 	return errors.Join(err, <-placed)
 }
 
 // focusRex goes to the next agent in the Rex app, or opens the Inbox there
-// on its Tasks tabs or on Needs you. ws is Rex's windows, whose title names
-// the session the app shows.
-func focusRex(what string, ws []window) error {
+// on its Tasks tabs or on Needs you. shown is the session label Rex displayed
+// while focused before the jump, or "" when another app had focus.
+func focusRex(what, shown string) error {
 	var client string
 	connect := func() (err error) { client, err = (mux.Rex{}).App(); return err }
 	if what == "agent" {
-		r := watchedRex(mux.Rex{}, ws)
+		r := watchedRex(mux.Rex{}, shown)
 		var s mux.Snapshot
 		var read error
 		var wg sync.WaitGroup
@@ -217,14 +220,12 @@ func watched(b mux.Backend) mux.Backend {
 	if !ok {
 		return b
 	}
-	r.Shown = focusedRex()
-	_ = readJSON("seen.json", &r.Seen)
-	return r
+	return watchedRex(r, focusedRex())
 }
 
-// watchedRex is watched for Rex, given ws, Rex's windows.
-func watchedRex(r mux.Rex, ws []window) mux.Rex {
-	r.Shown, _ = windowLabel(ws)
+// watchedRex attaches the focused Rex session label and seen records to r.
+func watchedRex(r mux.Rex, shown string) mux.Rex {
+	r.Shown = shown
 	_ = readJSON("seen.json", &r.Seen)
 	return r
 }
@@ -261,6 +262,9 @@ func ensureTmuxClient() (string, error) {
 		}
 		return client, bringToCode(ghosttyBundle, ws)
 	}
+	if _, err := runIn("", "aerospace", "workspace", codeWorkspace); err != nil {
+		return "", err
+	}
 	if _, err := runIn("", "open", "-n", "-b", ghosttyBundle, "--args", "-e", "tmux", "new-session", "-A", "-s", "main"); err != nil {
 		return "", err
 	}
@@ -275,13 +279,15 @@ func ensureTmuxClient() (string, error) {
 	return client, err
 }
 
-// bringToCode focuses the app's window on the code workspace, moving one
-// there when none is. ws is the app's windows. An app with no window yet
-// opens one on the focused workspace, which the key has already made the
-// code workspace.
+// bringToCode switches to the code workspace and focuses the app's window
+// there, moving one onto it when needed or launching the app on it when none
+// exists. ws is the app's windows.
 func bringToCode(bundle string, ws []window) error {
 	w, ok := pickWindow(ws)
 	if !ok {
+		if _, err := runIn("", "aerospace", "workspace", codeWorkspace); err != nil {
+			return err
+		}
 		_, err := runIn("", "open", "-b", bundle)
 		return err
 	}
@@ -289,6 +295,9 @@ func bringToCode(bundle string, ws []window) error {
 		if _, err := runIn("", "aerospace", "move-node-to-workspace", "--window-id", w.id, codeWorkspace); err != nil {
 			return err
 		}
+	}
+	if _, err := runIn("", "aerospace", "workspace", codeWorkspace); err != nil {
+		return err
 	}
 	_, err := runIn("", "aerospace", "focus", "--window-id", w.id)
 	return err

@@ -2,6 +2,8 @@ package main
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -185,9 +187,17 @@ func TestNextAgent(t *testing.T) {
 		want  []string
 	}{
 		{
-			"one blocked and three done alternates back to the blocked agent",
+			"one blocked and three done stays on the blocked agent",
 			append([]mux.Pane{{ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)}}, threeDone...),
-			[]string{"blocked", "done-1", "blocked", "done-2", "blocked", "done-3"},
+			[]string{"blocked", "blocked", "blocked"},
+		},
+		{
+			"one blocked and working agents stays on the blocked agent",
+			[]mux.Pane{
+				{ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)},
+				{ID: "working", Status: mux.Working, Updated: at(6)},
+			},
+			[]string{"blocked", "blocked"},
 		},
 		{
 			"two blocked and three done stays on the blocked agents",
@@ -213,27 +223,81 @@ func TestNextAgent(t *testing.T) {
 	}
 }
 
-// The watch job keeps the done or error record of the pane you were looking at
-// as it came in, so it doesn't need you once you look away, and forgets the
-// records of panes that have closed.
+// The watch job keeps the done or error records of every visible pane in the
+// focused tab as they come in, so they don't need you once you look away, and
+// forgets the records of panes that have closed.
 func TestTheWatchJobKeepsARecordYouLookedAt(t *testing.T) {
 	finished := time.Date(2026, 11, 17, 12, 0, 0, 0, time.UTC)
 	for _, status := range []mux.Status{mux.Done, mux.Error} {
 		t.Run(status.String(), func(t *testing.T) {
 			stateDir = t.TempDir()
 			s := mux.Snapshot{Panes: []mux.Pane{
-				{Label: "api", ID: "looked-at", Landing: true, Status: status, Updated: finished},
-				{Label: "api", ID: "beside", Status: status, Updated: finished},
-				{Label: "web", ID: "elsewhere", Landing: true, Status: status, Updated: finished},
+				{Label: "api", ID: "looked-at", Landing: true, Visible: true, Status: status, Updated: finished},
+				{Label: "api", ID: "split-beside", Visible: true, Status: status, Updated: finished},
+				{Label: "api", ID: "other-tab", Status: status, Updated: finished},
+				{Label: "web", ID: "elsewhere", Landing: true, Visible: true, Status: status, Updated: finished},
 			}}
 			noteSeen(s, "api", map[string]time.Time{"closed": finished})
 			var seen map[string]time.Time
 			if err := readJSON("seen.json", &seen); err != nil {
 				t.Fatal(err)
 			}
-			if want := map[string]time.Time{"looked-at": finished}; !maps.EqualFunc(seen, want, time.Time.Equal) {
-				t.Errorf("the job kept %v, want only the record you looked at", seen)
+			if want := map[string]time.Time{"looked-at": finished, "split-beside": finished}; !maps.EqualFunc(seen, want, time.Time.Equal) {
+				t.Errorf("the job kept %v, want only the visible records you looked at", seen)
 			}
 		})
+	}
+}
+
+// handleAgents records seen.json immediately before the publish settle timer
+// fires, so switching away within 300ms of an agent finishing does not make
+// that report reappear.
+func TestHandleAgentsRecordsSeenBeforeSettle(t *testing.T) {
+	stateDir = t.TempDir()
+	bin := t.TempDir()
+	focused := filepath.Join(bin, "focused")
+	if err := os.WriteFile(focused, []byte("com.superlogical.rex|agy - api\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	aerospace := "#!/bin/sh\ncat \"" + focused + "\"\n"
+	rex := `#!/bin/sh
+cat >/dev/null
+cat <<'EOF'
+{"sessions":[{"id":"s1","label":"api"}],
+ "panes":[
+  {"session":"s1","label":"api","id":"p1","tab":"w1","focused":true,"landing":true,"visible":true,"status":"done","updated":"2026-11-25T12:05:00Z","shown":["2026-11-25T12:00:00Z"]}
+ ]}
+EOF
+`
+	for name, body := range map[string]string{"aerospace": aerospace, "rex": rex} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o700); err != nil { //nolint:gosec // test writes executable shims to temp PATH
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+
+	w := &attentionWatcher{b: mux.Rex{}}
+	w.handleAgents()
+	if w.timer != nil {
+		defer w.timer.Stop()
+	}
+	var seen map[string]time.Time
+	if err := readJSON("seen.json", &seen); err != nil {
+		t.Fatalf("seen.json wasn't written before settle: %v", err)
+	}
+	finished := time.Date(2026, 11, 25, 12, 5, 0, 0, time.UTC)
+	if want := map[string]time.Time{"p1": finished}; !maps.EqualFunc(seen, want, time.Time.Equal) {
+		t.Fatalf("seen.json = %v, want %v", seen, want)
+	}
+	// Switch away immediately, well before agentSettle elapses.
+	if err := os.WriteFile(focused, []byte("com.google.Chrome|Docs - Google Chrome\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := watched(mux.Rex{}).Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := agentLevel(s); got != "none" {
+		t.Errorf("after quick switch away: agentLevel = %q, want none", got)
 	}
 }

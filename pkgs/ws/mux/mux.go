@@ -35,6 +35,7 @@ type Pane struct {
 	Tab, TabName       string
 	Focused            bool // where going to its tab lands
 	Landing            bool // where going to its session lands: the focused pane of the active tab
+	Visible            bool // in the session's active tab
 	Program, Folder    string
 	Status             Status // Open when the program reports nothing
 	// NeedsYou says the pane's agent needs you and you haven't looked at the

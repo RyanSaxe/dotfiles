@@ -218,7 +218,7 @@ func (r Rex) Snapshot() (Snapshot, error) {
 		Panes    luaList[struct {
 			Session, Label, ID, Tab, Program, Folder, Status, App, Title string
 			TabName                                                      string `json:"tab_name"`
-			Focused, Landing                                             bool
+			Focused, Landing, Visible                                    bool
 			Updated                                                      time.Time
 			Shown                                                        luaList[time.Time]
 		}]
@@ -233,10 +233,11 @@ func (r Rex) Snapshot() (Snapshot, error) {
 	for _, p := range read.Panes {
 		status, _ := ParseStatus(p.Status)
 		pane := Pane{
-			Session: p.Session, Label: p.Label, ID: p.ID, Tab: p.Tab, TabName: p.TabName, Focused: p.Focused, Landing: p.Landing,
+			Session: p.Session, Label: p.Label, ID: p.ID, Tab: p.Tab, TabName: p.TabName,
+			Focused: p.Focused, Landing: p.Landing, Visible: p.Visible,
 			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated,
 		}
-		pane.NeedsYou = r.needsYou(pane, p.Shown, r.Shown != "" && p.Label == r.Shown && p.Landing)
+		pane.NeedsYou = r.needsYou(pane, p.Shown, r.Shown != "" && p.Label == r.Shown && (p.Visible || p.Landing))
 		s.Panes = append(s.Panes, pane)
 	}
 	return s, err

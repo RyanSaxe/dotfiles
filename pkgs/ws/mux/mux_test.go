@@ -218,8 +218,10 @@ cat >/dev/null
 cat <<'EOF'
 {"sessions": [{"id": "s:api", "label": "api"}, {"id": "s:web", "label": "web"}],
  "panes": [
-  {"session": "s:api", "label": "api", "id": "looked-at", "landing": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
-  {"session": "s:web", "label": "web", "id": "blocked", "landing": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:api", "label": "api", "id": "looked-at", "landing": true, "visible": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:api", "label": "api", "id": "split-beside", "landing": false, "visible": true, "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:api", "label": "api", "id": "hidden-tab", "landing": false, "visible": false, "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:web", "label": "web", "id": "blocked", "landing": true, "visible": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
   {"session": "s:web", "label": "web", "id": "failed-unseen", "status": "error", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:00:00Z"]},
   {"session": "s:web", "label": "web", "id": "failed-shown-since", "status": "error", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:06:00Z"]},
   {"session": "s:web", "label": "web", "id": "failed-listed", "status": "error", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:00:00Z"]},
@@ -246,7 +248,7 @@ EOF`
 			needing = append(needing, p.ID)
 		}
 	}
-	if want := []string{"blocked", "failed-unseen", "unseen", "never-shown"}; !slices.Equal(needing, want) {
+	if want := []string{"hidden-tab", "blocked", "failed-unseen", "unseen", "never-shown"}; !slices.Equal(needing, want) {
 		t.Errorf("%v need you, want %v", needing, want)
 	}
 }

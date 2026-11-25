@@ -74,7 +74,8 @@ func parseTmuxPane(line string, processes processTree) (Session, Pane, bool) {
 	}
 	id := "=" + f[0] // = matches the name exactly
 	p := Pane{
-		Session: id, Label: f[0], ID: f[2], Tab: f[8], TabName: f[9], Focused: strings.HasSuffix(f[1], "1"), Landing: f[1] == "11",
+		Session: id, Label: f[0], ID: f[2], Tab: f[8], TabName: f[9],
+		Focused: strings.HasSuffix(f[1], "1"), Landing: f[1] == "11", Visible: strings.HasPrefix(f[1], "1"),
 		Program: f[4], Folder: f[5], Status: Open, Title: f[10],
 	}
 	if pid, err := strconv.Atoi(f[3]); err == nil && processes.runsAgent(pid) {
