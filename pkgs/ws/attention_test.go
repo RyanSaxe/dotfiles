@@ -187,9 +187,17 @@ func TestNextAgent(t *testing.T) {
 		want  []string
 	}{
 		{
-			"one blocked and three done alternates back to the blocked agent",
+			"one blocked and three done stays on the blocked agent",
 			append([]mux.Pane{{ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)}}, threeDone...),
-			[]string{"blocked", "done-1", "blocked", "done-2", "blocked", "done-3"},
+			[]string{"blocked", "blocked", "blocked"},
+		},
+		{
+			"one blocked and working agents stays on the blocked agent",
+			[]mux.Pane{
+				{ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)},
+				{ID: "working", Status: mux.Working, Updated: at(6)},
+			},
+			[]string{"blocked", "blocked"},
 		},
 		{
 			"two blocked and three done stays on the blocked agents",
