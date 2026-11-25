@@ -303,3 +303,59 @@ def test_audit_checks_setup_uv_across_all_workflows_and_handles_domain_check_yml
     assert "ci.yml setup-uv semver pin" not in after_items
     assert "release.yml setup-uv semver pin" not in after_items
     assert after["workflows"]["fragmented"] is True
+
+
+def test_audit_skips_templates_subdirectory_projects(tmp_path: Path) -> None:
+    tpl = tmp_path / "skills/project-setup/templates"
+    tpl.mkdir(parents=True)
+    (tpl / "pyproject.toml").write_text('[tool.ruff.lint]\nselect = ["ALL"]\n', encoding="utf-8")
+    (tpl / "go.mod").write_text("module example.com/template\n", encoding="utf-8")
+
+    report = _run_audit(tmp_path)
+    present = report["stacks"]["present"]
+    assert "python" not in present
+    assert "go" not in present
+    missing_items = {entry["item"] for entry in report["missing_configs"]}
+    assert not any("templates/" in item for item in missing_items)
+
+
+def test_audit_accepts_standalone_ruff_toml_and_pinned_ty_hook(tmp_path: Path) -> None:
+    (tmp_path / "script.py").write_text("def greet(name: str) -> str:\n    return name\n", encoding="utf-8")
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        "max-file-lines\nuvx ty@0.0.105 check\n",
+        encoding="utf-8",
+    )
+    ruff_toml = tmp_path / "ruff.toml"
+    ruff_toml.write_text(
+        '[lint]\nselect = ["ALL"]\n'
+        "[lint.mccabe]\nmax-complexity = 8\n"
+        "[lint.pylint]\nmax-positional-args = 2\nmax-branches = 10\nmax-nested-blocks = 4\n"
+        '[lint.flake8-tidy-imports.banned-api]\n"typing.cast".msg = "no cast"\n',
+        encoding="utf-8",
+    )
+
+    clean = _run_audit(tmp_path)
+    py_missing = [entry["item"] for entry in clean["missing_configs"] if entry["scope"] == "python"]
+    assert py_missing == []
+
+    ruff_toml.write_text(
+        '[lint]\nselect = ["ALL"]\n[lint.mccabe]\nmax-complexity = 12\n',
+        encoding="utf-8",
+    )
+    weak = _run_audit(tmp_path)
+    weak_items = {entry["item"] for entry in weak["missing_configs"] if entry["scope"] == "python"}
+    assert "[lint.mccabe] max-complexity <= 8" in weak_items
+
+
+def test_audit_ignores_standalone_node_script_without_package_json(tmp_path: Path) -> None:
+    (tmp_path / "statusline.js").write_text('#!/usr/bin/env node\nconsole.log("ok");\n', encoding="utf-8")
+
+    script_only = _run_audit(tmp_path)
+    assert "web" not in script_only["stacks"]["present"]
+    assert "web" not in script_only["byor"]["expected_packages"]
+    assert [e for e in script_only["missing_configs"] if e["scope"] == "web"] == []
+
+    (tmp_path / "app.js").write_text('console.log("web");\n', encoding="utf-8")
+    with_web = _run_audit(tmp_path)
+    assert "web" in with_web["stacks"]["present"]
+    assert "web" in with_web["byor"]["expected_packages"]

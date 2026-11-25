@@ -1,0 +1,4 @@
+[environment]
+# The standalone project-setup audit entrypoint imports its sibling modules
+# from this script directory.
+extra-paths = ["ai-harness/skills/project-setup/scripts"]
