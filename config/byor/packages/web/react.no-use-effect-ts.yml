@@ -1,0 +1,28 @@
+id: react.no-use-effect-ts
+language: TypeScript
+severity: error
+message: Avoid `useEffect` and `useLayoutEffect` directly in product UI; encapsulate real external synchronization in `hooks/`.
+ignores:
+  - "**/hooks/**"
+rule:
+  any:
+    - pattern: useEffect($$$ARGS)
+    - pattern: useLayoutEffect($$$ARGS)
+    - pattern: React.useEffect($$$ARGS)
+    - pattern: React.useLayoutEffect($$$ARGS)
+metadata:
+  byor:
+    rationale: >
+      Direct effects in product UI modules cause extra render passes,
+      stale-closure bugs, and cascading state updates when state should be
+      derived during render or handled in user events.
+    agent_prompt: >
+      Remove the direct `useEffect` / `useLayoutEffect` call from product UI:
+      derive state during render, run side effects in event handlers, or use
+      `useSyncExternalStore` / `useEffectEvent` (React 19.2). When
+      synchronizing with a genuine external system (DOM observer, socket,
+      subscription, timer), encapsulate it in a dedicated custom hook under
+      `hooks/`.
+    tags:
+      - react
+      - web

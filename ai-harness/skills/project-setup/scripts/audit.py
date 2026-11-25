@@ -40,6 +40,7 @@ OXLINT_TS_RULES = (
     | frozenset({"typescript/switch-exhaustiveness-check", "typescript/no-misused-promises"})
     | frozenset({"typescript/explicit-function-return-type"})
 )
+OXLINT_REACT_PLUGINS = frozenset({"react", "jsx-a11y"})
 GOLANGCI_REQUIRED = frozenset({"cyclop", "gocognit", "nestif", "revive", "gosec"}) | frozenset(
     {"errcheck", "errorlint", "staticcheck", "gofumpt"}
 )
@@ -545,43 +546,52 @@ def _missing_python_configs(root: Path, pyproject: dict[str, Any], *, precommit_
     return missing
 
 
-def _missing_oxlint_rules(root: Path, *, has_typescript: bool) -> list[dict[str, str]]:
-    cfg = _read_json(root / ".oxlintrc.json", jsonc=True)
-    rules = _as_dict(cfg.get("rules"))
-    required = OXLINT_COMMON_RULES | (OXLINT_TS_RULES if has_typescript else frozenset())
-    absent = sorted(rule for rule in required if rule not in rules)
+def _missing_react_oxlint_plugins(cfg: dict[str, Any]) -> list[dict[str, str]]:
+    raw = cfg.get("plugins")
+    plugins = {p for p in raw if isinstance(p, str)} if isinstance(raw, list) else set()
+    absent = sorted(OXLINT_REACT_PLUGINS - plugins)
     if not absent:
         return []
-    preview = ", ".join(absent[:MAX_RULE_PREVIEW]) + (
-        f" (+{len(absent) - MAX_RULE_PREVIEW} more)" if len(absent) > MAX_RULE_PREVIEW else ""
-    )
-    return [{"scope": "web", "item": ".oxlintrc.json parity rules", "detail": f"missing: {preview}"}]
+    return [{"scope": "web", "item": ".oxlintrc.json React plugins", "detail": f"missing: {', '.join(absent)}"}]
+
+
+def _missing_oxlint_rules(root: Path, stacks: dict[str, Any]) -> list[dict[str, str]]:
+    cfg = _read_json(root / ".oxlintrc.json", jsonc=True)
+    rules = _as_dict(cfg.get("rules"))
+    required = OXLINT_COMMON_RULES | (OXLINT_TS_RULES if stacks["has_typescript"] else frozenset())
+    if stacks["has_react"]:
+        required |= frozenset({"no-restricted-imports"})
+    absent = sorted(required - rules.keys())
+    missing: list[dict[str, str]] = []
+    if absent:
+        extra = f" (+{len(absent) - MAX_RULE_PREVIEW} more)" if len(absent) > MAX_RULE_PREVIEW else ""
+        preview = ", ".join(absent[:MAX_RULE_PREVIEW]) + extra
+        missing.append({"scope": "web", "item": ".oxlintrc.json parity rules", "detail": f"missing: {preview}"})
+    if stacks["has_react"]:
+        missing.extend(_missing_react_oxlint_plugins(cfg))
+    return missing
 
 
 def _missing_web_configs(root: Path, stacks: dict[str, Any], *, package_json: dict[str, Any]) -> list[dict[str, str]]:
     missing: list[dict[str, str]] = []
     node_deps = _collect_node_deps(package_json)
-
-    def need(item: str, detail: str) -> None:
-        missing.append({"scope": "web", "item": item, "detail": detail})
-
     for rel, detail in (
         ("package-lock.json", "committed npm lockfile"),
         (".oxfmtrc.json", "oxfmt config"),
         (".oxlintrc.json", "oxlint config"),
     ):
         if not (root / rel).is_file():
-            need(rel, detail)
-    for dep, detail in (
-        ("oxfmt", "install oxfmt in package.json"),
-        ("oxlint", "install oxlint in package.json"),
-    ):
-        if dep not in node_deps:
-            need(f"{dep} devDependency", detail)
+            missing.append({"scope": "web", "item": rel, "detail": detail})
+    missing.extend(
+        {"scope": "web", "item": f"{dep} devDependency", "detail": f"install {dep} in package.json"}
+        for dep in ("oxfmt", "oxlint")
+        if dep not in node_deps
+    )
     if stacks["has_typescript"] and "oxlint-tsgolint" not in node_deps:
-        need("oxlint-tsgolint devDependency", "type-aware oxlint checks replacing tsc")
+        detail = "type-aware oxlint checks replacing tsc"
+        missing.append({"scope": "web", "item": "oxlint-tsgolint devDependency", "detail": detail})
     if (root / ".oxlintrc.json").is_file():
-        missing.extend(_missing_oxlint_rules(root, has_typescript=stacks["has_typescript"]))
+        missing.extend(_missing_oxlint_rules(root, stacks))
     return missing
 
 

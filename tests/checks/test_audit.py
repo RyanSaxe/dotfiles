@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,14 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[2]
 AUDIT_SCRIPT = REPO / "ai-harness/skills/project-setup/scripts/audit.py"
 EMMYRC_TEMPLATE = REPO / "ai-harness/skills/project-setup/templates/emmyrc.json"
+OXLINTRC_TEMPLATE = REPO / "ai-harness/skills/project-setup/templates/oxlintrc.json"
+JSONC_TOKEN_RE = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
+
+
+def _parse_jsonc(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8")
+    stripped = JSONC_TOKEN_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", text)
+    return json.loads(stripped)
 
 
 def _run_audit(target: Path) -> dict[str, Any]:
@@ -113,3 +122,50 @@ def test_audit_detects_nested_golangci_empty_oxlint_and_selene(tmp_path: Path) -
     assert ".oxlintrc.json parity rules" in missing_items
     legacy = {(entry["category"], entry["tool"]) for entry in report["legacy_tooling"]}
     assert ("lua", "selene") in legacy
+
+
+def test_oxlintrc_template_is_valid_jsonc_and_enforces_react_useeffect_boundary() -> None:
+    parsed = _parse_jsonc(OXLINTRC_TEMPLATE)
+    rule = parsed["rules"]["no-restricted-imports"]
+    assert rule[0] == "error"
+    react_paths = [entry for entry in rule[1]["paths"] if entry["name"] == "react"]
+    assert len(react_paths) == 1
+    assert set(react_paths[0]["importNames"]) == {"useEffect", "useLayoutEffect"}
+
+    overrides = parsed["overrides"]
+    hooks_overrides = [ov for ov in overrides if "**/hooks/**" in ov["files"]]
+    assert len(hooks_overrides) == 1
+    assert hooks_overrides[0]["rules"]["no-restricted-imports"] == "off"
+
+
+def test_audit_checks_react_oxlint_plugins_and_restricted_imports(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "dependencies": {"react": "19.2.0"},
+                "devDependencies": {"oxlint": "1.0.0", "oxfmt": "1.0.0", "oxlint-tsgolint": "1.0.0"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "package-lock.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / ".oxfmtrc.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "App.tsx").write_text("export function App() { return <div />; }\n", encoding="utf-8")
+
+    # Copy template without enabling react/jsx-a11y plugins yet.
+    (tmp_path / ".oxlintrc.json").write_text(OXLINTRC_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+    before = _run_audit(tmp_path)
+    before_items = {entry["item"]: entry["detail"] for entry in before["missing_configs"]}
+    assert ".oxlintrc.json parity rules" not in before_items
+    assert ".oxlintrc.json React plugins" in before_items
+    assert "react" in before_items[".oxlintrc.json React plugins"]
+    assert "jsx-a11y" in before_items[".oxlintrc.json React plugins"]
+
+    # Enable react + jsx-a11y plugins; React oxlint audit checks should now pass.
+    updated = _parse_jsonc(OXLINTRC_TEMPLATE)
+    updated["plugins"] = [*updated["plugins"], "react", "jsx-a11y"]
+    (tmp_path / ".oxlintrc.json").write_text(json.dumps(updated, indent=2), encoding="utf-8")
+    after = _run_audit(tmp_path)
+    after_items = {entry["item"] for entry in after["missing_configs"]}
+    assert ".oxlintrc.json parity rules" not in after_items
+    assert ".oxlintrc.json React plugins" not in after_items

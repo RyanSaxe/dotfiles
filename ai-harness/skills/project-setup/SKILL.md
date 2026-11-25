@@ -159,6 +159,14 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
   `typescript/no-misused-promises` and
   `typescript/explicit-function-return-type`. CLI entrypoints may opt out of
   `no-console`.
+- For React repos, enable the `"react"` and `"jsx-a11y"` plugins in
+  `.oxlintrc.json` and keep its `no-restricted-imports` rule banning
+  `useEffect` and `useLayoutEffect` from `"react"`, paired with an `overrides`
+  block that allows them only under `**/hooks/**` (or the repo's designated
+  primitive layer). Drop that rule and override in non-React repos. BYOR's
+  `web` package reinforces this in the edit loop by flagging direct
+  `useEffect` / `useLayoutEffect` calls outside `hooks/` and banning
+  `queueMicrotask` / `startTransition` wrappers inside effects everywhere.
 - For TypeScript projects (`"strict": true`), install `oxlint-tsgolint` with
   `--save-dev --save-exact` and add `--type-aware --type-check` to the `oxlint`
   hook so `oxlint` checks types in place of a separate `tsc` hook. A framework

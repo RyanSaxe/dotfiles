@@ -24,9 +24,9 @@ metadata:
       React Compiler silently bails out of optimizing components that contain
       try/finally blocks, and oxlint does not catch this in the fast path.
     agent_prompt: >
-      Move cleanup into a helper outside the component body, a useEffect
-      cleanup function, or an explicit try/catch with post-block cleanup so
-      React Compiler can optimize this component.
+      Move cleanup into a helper outside the component body, an explicit
+      try/catch with post-block cleanup, or a dedicated custom hook under
+      `hooks/` so React Compiler can optimize this component.
     tags:
       - react
       - web
