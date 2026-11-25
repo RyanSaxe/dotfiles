@@ -70,7 +70,8 @@ local function build_pane(session, view, names, lands, block)
     tab_name = names[tab],
     focused = tab ~= nil and lands[tab] == block.block_id,
   }
-  pane.landing = pane.focused and tab == view.active_window_id
+  pane.visible = view ~= nil and tab ~= nil and tab == view.active_window_id
+  pane.landing = pane.focused and pane.visible
   local process = rex.block.call(TERMINAL, "process", at)
   local foreground = process and process.foreground
   if foreground then

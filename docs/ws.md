@@ -196,16 +196,18 @@ all agents when none need you.
 `ws` reads each multiplexer's native tracking:
 
 - **tmux:** detects Claude Code, Codex, Antigravity, `pi` and Copilot CLI in the
-  process table. A window bell while no client views that window marks the agent
-  blocked (peach), because a bell cannot distinguish waiting from done; see
+  process table. A window bell while no client views that window sets the
+  attention level to `waiting` (peach, ranked with blocked), because a bell
+  cannot distinguish waiting from done; see
   [ai-harness/README.md](../ai-harness/README.md#agents-that-need-you). Go →
   Agents shows `working` while the window outputs and `idle` otherwise. Because
   tmux tracks bells and output per window, adjacent shell panes in the same
   window share those signals.
-- **Rex:** a blocked agent needs you until its status changes; a failed or done
-  agent needs you until a Rex window shows its pane. `ws attention --watch`
-  records failed/done reports seen while focused so looking away does not
-  re-trigger them.
+- **Rex:** a blocked agent needs you while its pane is not visible in a focused
+  Rex window; a failed or done agent needs you until a focused Rex window shows
+  its tab (including agents in split panes beside a focused shell).
+  `ws attention --watch` records failed and done reports visible in the focused
+  tab so looking away does not re-trigger them.
 
 ## Inbox
 

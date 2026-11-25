@@ -37,13 +37,12 @@ lib.mkIf (lib.elem "gui" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
       exec.env-vars.PATH = "${config.home.profileDirectory}/bin:\${PATH}";
       # Cmd-Alt-A, T and R bring Rex, or Ghostty on tmux where Rex isn't
       # installed, onto the code workspace, then go to the agent that needs
-      # you or open the Inbox on its Tasks tabs or on Needs you.
+      # you or open the Inbox on its Tasks tabs or on Needs you. ws switches
+      # to the code workspace itself after checking what had focus, so
+      # Cmd-Alt-A from another workspace doesn't treat Rex's background
+      # session as already looked at.
       mode.main.binding =
-        lib.mapAttrs
-          (_: what: [
-            "workspace code"
-            "exec-and-forget PATH='${rexDir}':$PATH ${ws}/bin/ws focus ${what}"
-          ])
+        lib.mapAttrs (_: what: "exec-and-forget PATH='${rexDir}':$PATH ${ws}/bin/ws focus ${what}")
           {
             cmd-alt-a = "agent";
             cmd-alt-t = "tasks";

@@ -63,19 +63,23 @@ func agentLevel(s mux.Snapshot) string {
 	return agentLevels[rank]
 }
 
-// noteSeen records in seen.json the failed or done record of the pane you're
-// looking at, the landing pane of the session Rex's window shows. A report
-// that came while you looked would need you once you looked away, since the
-// app asked for the pane's size before the report, and Rex.Snapshot doesn't
-// count a record listed there. The file keeps only the records of panes that
-// still exist, and the --watch job is its only writer.
+// noteSeen records in seen.json the failed or done records of every visible
+// pane in the active tab of the focused Rex window. A report that came while
+// you looked would need you once you looked away, since the app asked for the
+// pane's size before the report, and Rex.Snapshot doesn't count a record
+// listed there. The file keeps only the records of panes that still exist,
+// and the --watch job is its only writer.
+func isVisibleDoneOrError(p mux.Pane, shown string) bool {
+	return shown != "" && p.Label == shown && (p.Visible || p.Landing) && (p.Status == mux.Done || p.Status == mux.Error)
+}
+
 func noteSeen(s mux.Snapshot, shown string, seen map[string]time.Time) {
 	next := map[string]time.Time{}
 	for _, p := range s.Panes {
 		if t, ok := seen[p.ID]; ok {
 			next[p.ID] = t
 		}
-		if shown != "" && p.Label == shown && p.Landing && (p.Status == mux.Done || p.Status == mux.Error) {
+		if isVisibleDoneOrError(p, shown) {
 			next[p.ID] = p.Updated
 		}
 	}
@@ -168,9 +172,14 @@ func publish(name, level string) {
 	_ = exec.Command("sketchybar", "--trigger", event).Run() //nolint:gosec // triggers local sketchybar with ws attention event name
 }
 
+const agentSettle = 300 * time.Millisecond
+
 type attentionWatcher struct {
-	b  mux.Backend
-	in inbox
+	b       mux.Backend
+	in      inbox
+	pending string
+	timer   *time.Timer
+	settle  <-chan time.Time
 }
 
 func (w *attentionWatcher) republish() {
@@ -203,8 +212,8 @@ func (w *attentionWatcher) recountTasks() {
 }
 
 func (w *attentionWatcher) handleAgents() {
-	// A burst of reports, such as an agent finishing, settles first.
-	time.Sleep(300 * time.Millisecond)
+	// Snapshot and record seen immediately so a quick switch away doesn't miss
+	// a report you were looking at, then let bursts settle before publishing.
 	wb := watched(w.b)
 	s, err := wb.Snapshot()
 	if err != nil {
@@ -214,7 +223,13 @@ func (w *attentionWatcher) handleAgents() {
 	if r, ok := wb.(mux.Rex); ok {
 		noteSeen(s, r.Shown, r.Seen)
 	}
-	publish("agent-attention", agentLevel(s))
+	w.pending = agentLevel(s)
+	if w.timer == nil {
+		w.timer = time.NewTimer(agentSettle)
+	} else {
+		w.timer.Reset(agentSettle)
+	}
+	w.settle = w.timer.C
 }
 
 func (w *attentionWatcher) handleSignal(s os.Signal, reviews *time.Ticker) {
@@ -267,6 +282,9 @@ func watchAttention(b mux.Backend) error {
 			w.recountTasks()
 		case <-changed:
 			w.handleAgents()
+		case <-w.settle:
+			w.settle = nil
+			publish("agent-attention", w.pending)
 		case s := <-asked:
 			w.handleSignal(s, reviews)
 		case <-reviews.C:
